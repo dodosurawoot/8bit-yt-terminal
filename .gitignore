@@ -1,50 +1,12 @@
-# --- Caches & Temp Files ---
 __pycache__/
 *.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-.ipynb_checkpoints/
 .DS_Store
-.DS_Store?
-ehthumbs.db
-Icon?
-Thumbs.db
-
-# --- Virtual Environments ---
 .venv/
 venv/
-ENV/
-env/
-
-# --- Build & Distribution ---
 build/
 dist/
 *.egg-info/
-.eggs/
-eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-bin/
-develop-eggs/
-downloads/
-include/
-share/
-
-# --- Local Configurations & Logs ---
-.idea/
-.vscode/
-*.log
 *.spec
+*.log
 yt-terminal-mpv.sock
-/tmp/yt-terminal-mpv.sock
-/tmp/yt-terminal.log
-
-# --- Stale Legacy Artifacts ---
-YTMDPlayer.dist/
-*.txt
-*.md
-!README.md
+yt_terminal_mpv.sock

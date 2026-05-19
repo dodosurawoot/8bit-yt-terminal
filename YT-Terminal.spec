@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files
+
+datas = [('yt_terminal/style.tcss', '.'), ('yt_terminal/assets', 'assets')]
+datas += collect_data_files('ytmusicapi')
 
 
 a = Analysis(
     ['yt_terminal/main.py'],
     pathex=[],
     binaries=[],
-    datas=[('yt_terminal/style.tcss', 'yt_terminal'), ('yt_terminal/assets', 'yt_terminal/assets')],
+    datas=datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

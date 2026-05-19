@@ -21,7 +21,7 @@ class LoginScreen(Screen):
         height: auto;
         border: round #3c2633;
         background: #1c1216;
-        padding: 2;
+        padding: 2 4;
         border-title-color: #e8959a;
     }
 
@@ -34,13 +34,15 @@ class LoginScreen(Screen):
 
     .login-desc {
         text-align: center;
-        margin-bottom: 2;
+        margin-bottom: 1;
         color: #7a5a68;
+        text-wrap: wrap; /* Ensure long descriptions wrap cleanly without clipping */
     }
 
     .login-field-lbl {
         margin-top: 1;
         color: #fff0f0;
+        text-wrap: wrap;
     }
 
     .login-field {
@@ -61,38 +63,47 @@ class LoginScreen(Screen):
         text-style: bold;
     }
 
-    #oauth-details-box {
-        border: dashed #3c2633;
-        padding: 1 2;
+    #oauth-details-container {
+        display: none;
         margin-top: 1;
         margin-bottom: 1;
-        background: #2a1a22;
-        align: center middle;
+        padding: 1 2;
+        border: dashed #3c2633;
+        background: #23161c;
+    }
+
+    .oauth-step-title {
+        color: #fff0f0;
+        text-style: bold;
+        margin-top: 1;
+        margin-bottom: 1;
+        text-wrap: wrap;
     }
 
     .oauth-url {
-        text-style: underline;
-        color: #e8959a;
+        text-style: underline bold;
+        color: #50dc64; /* Neon green for high contrast visibility */
         text-align: center;
+        margin-top: 1;
+        margin-bottom: 2;
+        text-wrap: wrap;
     }
 
     .oauth-code {
         text-align: center;
         text-style: bold;
-        color: #fff0f0;
+        color: #fedb72; /* Glowing golden-yellow pairing code */
         background: #1c1216;
+        border: round #3c2633;
         padding: 1 3;
         margin: 1 0;
-    }
-
-    #oauth-details-container {
-        display: none;
     }
 
     .status-msg {
         text-align: center;
         color: #e8959a;
-        margin-top: 1;
+        margin-top: 2;
+        text-wrap: wrap;
     }
     """
 
@@ -137,11 +148,11 @@ class LoginScreen(Screen):
             )
 
             with Vertical(id="oauth-details-container") as details:
-                yield Label("1. Go to the verification URL in your browser:", classes="login-desc")
+                yield Label("⚡ STEP 1: Go to the verification URL in your browser:", classes="oauth-step-title")
                 yield Label("", id="verification-url-lbl", classes="oauth-url")
-                yield Label("2. Enter this device authorization code:", classes="login-desc")
+                yield Label("🔑 STEP 2: Enter this device authorization code:", classes="oauth-step-title")
                 yield Label("XXXX-XXXX", id="user-code-lbl", classes="oauth-code")
-                yield Label("Waiting for you to authorize standard Google access...", id="polling-status-lbl", classes="status-msg")
+                yield Label("Waiting for your authorization... ⏳", id="polling-status-lbl", classes="status-msg")
 
             with Horizontal(id="btn-container"):
                 yield Button("Connect Account", id="connect-btn", classes="action-btn")
