@@ -43,27 +43,26 @@ class SearchOverlay(Screen):
         layout: horizontal;
         align: center middle;
         width: 100%;
-        height: 2;
+        height: 3;
         margin-bottom: 1;
     }
 
     .filter-btn {
-        min-width: 12;
+        min-width: 14;
         margin: 0 1;
-        background: transparent;
-        border: none;
+        background: #2a1a22;
+        border: round #7a5260;
         color: #a68894;
-        height: 1;
-        padding: 0;
+        height: 3;
+        content-align: center middle;
     }
 
     .filter-btn.active {
-        background: transparent;
+        background: #3d232d;
         color: #fbe5e6;
-        border-bottom: solid #d38e91;
+        border: round #d38e91;
         text-style: bold;
-        height: 1;
-        padding: 0;
+        height: 3;
     }
 
     #search-results-list {
