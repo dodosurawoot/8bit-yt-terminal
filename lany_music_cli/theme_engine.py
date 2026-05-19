@@ -78,6 +78,36 @@ def extract_palette(image_path=None):
         logging.error(f"Failed to extract palette from image: {e}")
         return DEFAULT_THEME.copy()
 
+def download_and_extract(thumbnail_url: str) -> dict:
+    """
+    Downloads a thumbnail image, caches it, and extracts the theme palette.
+    Falls back to the default theme on any network or filesystem failures.
+    """
+    if not thumbnail_url:
+        return DEFAULT_THEME.copy()
+        
+    import hashlib
+    import requests
+    from lany_music_cli.config_manager import ConfigManager
+    
+    ConfigManager.ensure_dirs()
+    url_hash = hashlib.md5(thumbnail_url.encode("utf-8")).hexdigest()
+    cache_path = ConfigManager.CACHE_DIR / f"{url_hash}.jpg"
+    
+    if not cache_path.exists():
+        try:
+            r = requests.get(thumbnail_url, timeout=5)
+            if r.status_code == 200:
+                with open(cache_path, "wb") as f:
+                    f.write(r.content)
+            else:
+                return DEFAULT_THEME.copy()
+        except Exception as e:
+            logging.error(f"Failed to download thumbnail: {e}")
+            return DEFAULT_THEME.copy()
+            
+    return extract_palette(str(cache_path))
+
 def generate_tcss(theme_dict):
     """
     Generates the Textual CSS theme overrides based on the theme dictionary.
