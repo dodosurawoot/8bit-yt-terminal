@@ -206,20 +206,20 @@ AlbumArt {
     layout: horizontal;
     align: center bottom;
     width: 100%;
-    height: 14;
-    margin-bottom: 1;
+    height: 7; /* Compact vertical compression */
+    margin-bottom: 0;
 }
 
 .eq-col {
     layout: vertical;
     align: center bottom;
-    width: 12%;
+    width: 1fr; /* Distribute evenly across Center Pane */
     height: 100%;
 }
 
 .eq-bar {
     width: 1;
-    height: 100%;
+    height: 5; /* Compact vertical slider bar */
     color: $accent;
 }
 
@@ -231,10 +231,15 @@ AlbumArt {
 
 #vis-container {
     width: 100%;
-    height: 12;
-    border-top: dashed $border;
+    height: 10; /* Roomy high-density space for spectrum visualizer */
     margin-top: 1;
-    padding-top: 1;
+    padding: 0;
+}
+
+SpectrumVisualizer {
+    width: 100%;
+    height: 8;
+    content-align: center middle; /* Perfectly center the 28-column spectrum bars */
 }
 
 #eq-vis-toggle {
@@ -242,7 +247,7 @@ AlbumArt {
     align: center middle;
     width: 100%;
     height: 1;
-    margin-top: 1;
+    margin-top: 0;
 }
 
 .toggle-btn {

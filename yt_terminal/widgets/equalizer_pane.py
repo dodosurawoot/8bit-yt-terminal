@@ -47,15 +47,15 @@ class EqualizerWidget(Widget):
             return
             
         levels = EQ_PRESETS.get(self.preset_name, [5] * 8)
-        max_height = 10
+        max_height = 5
         
         for i, level in enumerate(levels):
-            # level is from 0 to 10
+            # Scale level (0-10) to max_height (5)
+            scaled_level = int(level / 2)
             bar_chars = []
             # We want to render a vertical block bar
-            # e.g., filled blocks from bottom to level height
             for h in range(max_height):
-                if h < level:
+                if h < scaled_level:
                     bar_chars.append("█")
                 else:
                     bar_chars.append("░")
@@ -77,7 +77,6 @@ class SpectrumVisualizer(Widget):
 
     def on_mount(self) -> None:
         self.border_title = "Visualizer"
-        # 30 frequency bands for the spectrum
         self.num_bars = 28
         self.bar_heights = [0 for _ in range(self.num_bars)]
         self.set_interval(0.08, self.animate_spectrum)
@@ -105,52 +104,57 @@ class SpectrumVisualizer(Widget):
             self.refresh()
             return
             
-        # Distribute RMS power across bands with simulated weight curve (heavy bass, lighter highs)
+        # Distribute RMS power across 28 bands with dynamic peak weighting
         for i in range(self.num_bars):
-            if i < 8:
-                weight = 1.3  # Bass
-            elif i < 18:
-                weight = 1.0  # Mids
+            if i < 6:
+                weight = 1.4  # Sub-Bass/Bass
+            elif i < 12:
+                weight = 1.1  # Mid-Bass
+            elif i < 20:
+                weight = 0.8  # Vocals/Mids
             else:
-                weight = 0.7  # Highs
+                weight = 0.5  # Presence/Highs
                 
-            # Add micro-fluctuation to columns for an alive, premium look
-            fluctuation = random.uniform(-0.12, 0.12)
-            target = int((amp * weight + fluctuation) * 8)
+            # Add dynamic, smooth organic noise to simulate authentic multi-band movement
+            fluctuation = random.uniform(-0.1, 0.1)
+            target = int((amp * weight + fluctuation) * 10)
             target = max(0, min(8, target))
             
             current = self.bar_heights[i]
             if current < target:
-                self.bar_heights[i] = min(8, current + 2)
+                self.bar_heights[i] = min(8, current + 2) # fast rise
             else:
-                self.bar_heights[i] = max(0, current - 1)
+                self.bar_heights[i] = max(0, current - 1) # smooth analog decay
                 
         self.refresh()
 
     def render(self) -> Text:
-        max_height = 6
+        max_height = 8  # 8 vertical steps for high-res spectrum mapping
         rows = []
         
         for h in range(max_height - 1, -1, -1):
-            # Dynamic Winamp classic green-yellow-red color spectrum gradient
-            if h >= 4:
-                color = "rgb(240,80,80)"  # Red peaks
+            # Dynamic Winamp classic green-yellow-orange-red color spectrum gradient
+            if h >= 6:
+                color = "rgb(240,80,80)"  # Red peaks (Rows 6-7)
+            elif h >= 4:
+                color = "rgb(248,140,50)" # Orange mids (Rows 4-5)
             elif h >= 2:
-                color = "rgb(250,200,50)"  # Yellow mids
+                color = "rgb(250,210,50)" # Yellow low-mids (Rows 2-3)
             else:
-                color = "rgb(50,220,100)"  # Green bass/low mids
+                color = "rgb(50,220,100)"  # Green bass base (Rows 0-1)
                 
             row_chars = []
             for i in range(self.num_bars):
                 val = self.bar_heights[i]
-                val_at_slice = val - (h * 1.5)
-                if val_at_slice >= 1.5:
+                # Scale value to match current slice height
+                val_at_slice = val - h
+                if val_at_slice >= 1.0:
                     row_chars.append(f"[{color}]█[/]")
                 elif val_at_slice >= 0.5:
                     row_chars.append(f"[{color}]▄[/]")
                 else:
                     row_chars.append(" ")
-            rows.append("   " + "".join(row_chars))
+            rows.append("".join(row_chars))
             
         return Text.from_markup("\n".join(rows))
 

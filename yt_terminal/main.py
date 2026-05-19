@@ -4,6 +4,7 @@ import os
 import sys
 import asyncio
 import logging
+import time
 
 logging.basicConfig(
     filename="/tmp/yt-terminal.log",
@@ -156,7 +157,7 @@ class YTTerminalApp(App):
         self.active_track_index = index
         track = self.queue[index]
         self._current_track = track
-        self._last_track_load_time = asyncio.get_event_loop().time()
+        self._last_track_load_time = time.time()
         log.info(f"▶ Playing [{index}]: {track.title} — {track.artist} (id={track.video_id})")
         
         # Start background asset, lyrics & queue updates in thread pools
@@ -242,24 +243,24 @@ class YTTerminalApp(App):
         if not self.player:
             return
 
-        # Guard: skip auto-advance for 5 seconds after loading a new track
-        # to let mpv fully initialize the new stream
-        try:
-            now = asyncio.get_event_loop().time()
-            if hasattr(self, '_last_track_load_time') and (now - self._last_track_load_time) < 5.0:
-                # Still in cooldown — update UI but don't auto-advance
-                pos = self.player.get_position()
-                if pos > 0:
-                    self.current_time = pos
-                    self.player_pane.track_current_time = int(pos)
-                    self.lyrics_view.current_time = pos
-                return
-        except Exception:
-            pass
-
         pos = self.player.get_position()
         dur = self.player.get_duration() or self._current_track.duration_seconds
-        
+
+        # Buffer & Cooldown Protection Guard
+        # During the first 8 seconds after loading, we filter out stale positions
+        # and ignore auto-advance checks while mpv buffers the network stream.
+        now = time.time()
+        if hasattr(self, '_last_track_load_time') and (now - self._last_track_load_time) < 8.0:
+            if pos > 5.0:
+                # Stale position from previous track while mpv buffers the new stream
+                pos = 0.0
+            
+            # Sync timeline using buffered position
+            self.current_time = pos
+            self.player_pane.track_current_time = int(pos)
+            self.lyrics_view.current_time = pos
+            return
+
         self.current_time = pos
         self.player_pane.track_current_time = int(pos)
         self.lyrics_view.current_time = pos
@@ -267,7 +268,7 @@ class YTTerminalApp(App):
         # Auto-advance to next song if active song finishes
         # Require dur > 10 to avoid false positives from mpv returning 0
         if dur > 10 and pos >= (dur - 1.0):
-            log.info(f"Track finished (pos={pos:.1f}, dur={dur:.1f}) — advancing")
+            log.info(f"Track finished (pos={pos:.1f}, dur={dur:.1f}) — advancing to next track")
             self.action_next_track()
 
     # --- Hotkey Actions ---
