@@ -139,11 +139,16 @@ class MusicService:
             return []
 
     async def get_playlist_tracks(self, playlist_id: str, limit: int = 50) -> List[Track]:
-        """Gets tracks from a playlist."""
-        if not self.yt:
-            return []
+        """Gets tracks from a playlist with robust public fallback."""
+        if self.yt:
+            try:
+                playlist = await asyncio.to_thread(self.yt.get_playlist, playlist_id, limit=limit)
+                return self._parse_tracks(playlist.get("tracks", []))
+            except Exception as e:
+                log.warning(f"Authenticated get_playlist failed ({e}) — falling back to public client")
+
         try:
-            playlist = await asyncio.to_thread(self.yt.get_playlist, playlist_id, limit=limit)
+            playlist = await asyncio.to_thread(self.yt_public.get_playlist, playlist_id, limit=limit)
             return self._parse_tracks(playlist.get("tracks", []))
         except Exception:
             return []
@@ -179,60 +184,91 @@ class MusicService:
             return []
 
     async def get_album_tracks(self, album_id: str) -> List[Track]:
-        """Gets individual tracks listed within a YouTube Music album."""
-        if not self.yt:
-            return []
+        """Gets individual tracks listed within a YouTube Music album with robust public fallback."""
+        if self.yt:
+            try:
+                album = await asyncio.to_thread(self.yt.get_album, album_id)
+                return self._parse_tracks(album.get("tracks", []))
+            except Exception as e:
+                log.warning(f"Authenticated get_album failed ({e}) — falling back to public client")
+
         try:
-            album = await asyncio.to_thread(self.yt.get_album, album_id)
+            album = await asyncio.to_thread(self.yt_public.get_album, album_id)
             return self._parse_tracks(album.get("tracks", []))
         except Exception:
             return []
 
     async def get_up_next_queue(self, video_id: str) -> List[Track]:
-        """Gets the autoplay/related songs queue from watch playlist."""
-        if not self.yt:
-            return []
+        """Gets the autoplay/related songs queue from watch playlist with robust public fallback."""
+        if self.yt:
+            try:
+                watch_data = await asyncio.to_thread(self.yt.get_watch_playlist, videoId=video_id, limit=15)
+                return self._parse_tracks(watch_data.get("tracks", []))
+            except Exception as e:
+                log.warning(f"Authenticated get_watch_playlist failed ({e}) — falling back to public client")
+
         try:
-            watch_data = await asyncio.to_thread(self.yt.get_watch_playlist, videoId=video_id, limit=15)
+            watch_data = await asyncio.to_thread(self.yt_public.get_watch_playlist, videoId=video_id, limit=15)
             return self._parse_tracks(watch_data.get("tracks", []))
         except Exception:
             return []
 
     async def get_lyrics(self, video_id: str) -> List[Dict[str, Any]]:
-        """Gets synced or static lyrics. Returns timed line dicts if possible."""
-        if not self.yt:
-            return []
-            
-        try:
-            # First, check if watch playlist has lyrics browseId
-            watch_data = await asyncio.to_thread(self.yt.get_watch_playlist, videoId=video_id)
-            lyrics_id = watch_data.get("lyrics")
-            if not lyrics_id:
+        """Gets synced or static lyrics with robust public fallback."""
+        watch_data = None
+        if self.yt:
+            try:
+                watch_data = await asyncio.to_thread(self.yt.get_watch_playlist, videoId=video_id)
+            except Exception as e:
+                log.warning(f"Authenticated get_watch_playlist for lyrics failed ({e}) — falling back to public client")
+
+        if not watch_data:
+            try:
+                watch_data = await asyncio.to_thread(self.yt_public.get_watch_playlist, videoId=video_id)
+            except Exception:
                 return []
-                
-            raw_lyrics = await asyncio.to_thread(self.yt.get_lyrics, lyrics_id)
+
+        lyrics_id = watch_data.get("lyrics")
+        if not lyrics_id:
+            return []
+
+        raw_lyrics = None
+        if self.yt:
+            try:
+                raw_lyrics = await asyncio.to_thread(self.yt.get_lyrics, lyrics_id)
+            except Exception as e:
+                log.warning(f"Authenticated get_lyrics failed ({e}) — falling back to public client")
+
+        if not raw_lyrics:
+            try:
+                raw_lyrics = await asyncio.to_thread(self.yt_public.get_lyrics, lyrics_id)
+            except Exception:
+                return []
+
+        try:
             text = raw_lyrics.get("lyrics", "")
-            
-            # YouTube Music standard API returns plain static lyrics.
-            # We split by line and add mock timestamps that progress roughly with song.
-            lines = [line.strip() for line in text.split("\n") if line.strip()]
-            parsed_lines = []
-            
-            # Simple progressive timestamp estimation if they are not pre-timed
-            duration = watch_data.get("tracks", [{}])[0].get("duration_seconds", 180)
-            if not duration:
-                duration = 180
-            time_per_line = max(1.5, min(6.0, duration / max(1, len(lines))))
-            
-            for i, line in enumerate(lines):
-                start = i * time_per_line
-                parsed_lines.append({
-                    "start": start,
-                    "text": line
-                })
-            return parsed_lines
+            return self._parse_lyrics_from_watch_and_text(watch_data, text)
         except Exception:
             return []
+
+    def _parse_lyrics_from_watch_and_text(self, watch_data: dict, text: str) -> List[Dict[str, Any]]:
+        """Utility helper to estimate line timings cleanly."""
+        if not text:
+            return []
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        parsed_lines = []
+        duration = watch_data.get("tracks", [{}])[0].get("duration_seconds", 180)
+        if not duration:
+            duration = 180
+        time_per_line = max(1.5, min(6.0, duration / max(1, len(lines))))
+        
+        for i, line in enumerate(lines):
+            start = i * time_per_line
+            parsed_lines.append({
+                "start": start,
+                "text": line
+            })
+        return parsed_lines
 
     # --- Utility Parsing Helpers ---
 
