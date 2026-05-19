@@ -118,10 +118,12 @@ class SearchOverlay(Screen):
             else:
                 for i, track in enumerate(tracks):
                     # Make a beautiful single line row matching visual columns
-                    row = Horizontal(classes="search-item-row")
-                    row.compose_add(Label(track.title, classes="search-item-title"))
-                    row.compose_add(Label(f" - {track.artist}", classes="search-item-artist"))
-                    row.compose_add(Label(track.album, classes="search-item-album"))
+                    row = Horizontal(
+                        Label(track.title, classes="search-item-title"),
+                        Label(f" - {track.artist}", classes="search-item-artist"),
+                        Label(track.album, classes="search-item-album"),
+                        classes="search-item-row"
+                    )
                     
                     item = ListItem(row)
                     # Bind index to list item

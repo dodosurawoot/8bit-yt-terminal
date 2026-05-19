@@ -30,14 +30,11 @@ class EqualizerWidget(Widget):
             self.sliders = []
             bands = ["16", "12", "24", "58", "10k", "260", "...", "8k"]
             for i, band in enumerate(bands):
-                col = Vertical(classes="eq-col")
                 # Slide indicator label (vertical bar representation)
                 bar = Label("", classes="eq-bar")
                 lbl = Label(band, classes="eq-label")
-                col.compose_add(bar)
-                col.compose_add(lbl)
                 self.sliders.append(bar)
-                yield col
+                yield Vertical(bar, lbl, classes="eq-col")
                 
     def on_mount(self):
         self.update_sliders()
