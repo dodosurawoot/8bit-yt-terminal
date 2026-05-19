@@ -78,7 +78,7 @@ class SpectrumVisualizer(Widget):
     current_style = reactive(0) # 0: Chunky LED Grid, 1: HUD Mirrored, 2: Analog Wave, 3: Digital Solid
 
     def on_mount(self) -> None:
-        self.num_bars = 12
+        self.num_bars = 24
         self.bar_heights = [0 for _ in range(self.num_bars)]
         self.peak_heights = [0 for _ in range(self.num_bars)]
         self.peak_delays = [0 for _ in range(self.num_bars)]
@@ -96,7 +96,7 @@ class SpectrumVisualizer(Widget):
             2: "Analog Wave",
             3: "Digital Solid"
         }
-        self.border_title = f"Visualizer ({style_names.get(self.current_style, 'Chunky LED Grid')}) • Click to Toggle"
+        self.border_title = f"{style_names.get(self.current_style, 'Chunky LED Grid')}"
 
     def on_click(self, event=None) -> None:
         """Cycle visualizer style on mouse click."""
@@ -277,18 +277,19 @@ class SpectrumVisualizer(Widget):
 
         # Style 2: Continuous Analog Oscilloscope (CRT radar scrolling wave)
         elif self.current_style == 2:
-            interp_heights = [0.0] * 23
-            for x in range(23):
+            num_cols = self.num_bars * 2 - 1
+            interp_heights = [0.0] * num_cols
+            for x in range(num_cols):
                 if x % 2 == 0:
                     interp_heights[x] = float(self.bar_heights[x // 2])
                 else:
                     left = float(self.bar_heights[x // 2])
-                    right = float(self.bar_heights[x // 2 + 1]) if (x // 2 + 1) < 12 else left
+                    right = float(self.bar_heights[x // 2 + 1]) if (x // 2 + 1) < self.num_bars else left
                     interp_heights[x] = (left + right) / 2.0
                     
             for h in range(max_height - 1, -1, -1):
                 row_chars = []
-                for x in range(23):
+                for x in range(num_cols):
                     wave_h = int(interp_heights[x])
                     if wave_h == h:
                         row_chars.append("[#00ff66]█[/]")

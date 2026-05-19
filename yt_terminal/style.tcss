@@ -248,7 +248,7 @@ SpectrumVisualizer {
     border-title-color: $accent;
     width: 100%;
     height: 8; /* 6 lines of render + 2 border rows = 8 */
-    content-align: center middle; /* Perfectly center the dynamic columns */
+    content-align: center bottom; /* Perfectly bottom center the dynamic columns */
     background: transparent;
 }
 

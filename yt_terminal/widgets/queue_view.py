@@ -1,3 +1,5 @@
+
+
 # Right-Bottom Pane: Up Next Queue View
 
 from textual.widget import Widget
