@@ -159,11 +159,11 @@ class LanyMusicApp(App):
 
     def _cancel_background_tasks(self):
         """Cancels stale asynchronous requests to avoid thread collisions."""
-        if self._asset_task and not self._asset_task.done():
+        if self._asset_task and not self._asset_task.is_finished:
             self._asset_task.cancel()
-        if self._lyrics_task and not self._lyrics_task.done():
+        if self._lyrics_task and not self._lyrics_task.is_finished:
             self._lyrics_task.cancel()
-        if self._queue_task and not self._queue_task.done():
+        if self._queue_task and not self._queue_task.is_finished:
             self._queue_task.cancel()
 
     async def update_track_theme_and_artwork(self, track: Track):
