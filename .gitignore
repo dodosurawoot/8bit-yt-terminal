@@ -1,2 +1,5 @@
 __pycache__
 YTMDPlayer.dist
+*.md
+*.txt
+Implementation_plan.md
