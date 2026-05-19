@@ -6,6 +6,9 @@ from textual.containers import Vertical, Horizontal
 from textual.reactive import reactive
 from yt_terminal.music_service import Track
 
+import logging
+log = logging.getLogger("yt-terminal")
+
 class QueueItemWidget(Widget):
     """Renders a single song card in the playlist queue."""
     def __init__(self, track_info: Track, **kwargs):
@@ -55,36 +58,43 @@ class QueueView(Widget):
 
     async def watch_queue_data(self, new_val):
         """Reactively updates the visual list when queue changes."""
+        log.info(f"[QueueView] watch_queue_data triggered with {len(new_val) if new_val else 0} items")
         try:
             lv = self.query_one("#queue-list", ListView)
-        except Exception:
-            # Widget not fully composed yet
+        except Exception as e:
+            log.warning(f"[QueueView] failed to find #queue-list: {e}")
             return
 
-        # Remove all existing children explicitly and await each removal
-        # to ensure DOM is fully clean before inserting new items.
-        # lv.clear() alone is NOT synchronous — old nodes linger and cause DuplicateIds.
+        # Clear existing items safely
         try:
-            for child in list(lv.children):
-                await child.remove()
-        except Exception:
-            pass
+            lv.clear()
+            log.info("[QueueView] Cleared #queue-list successfully using lv.clear()")
+        except Exception as e:
+            log.warning(f"[QueueView] lv.clear() failed: {e}")
+            # Fallback manual removal
+            try:
+                for child in list(lv.children):
+                    await child.remove()
+            except Exception:
+                pass
 
         self.list_items = []
         
         if not new_val:
+            log.info("[QueueView] queue_data is empty, appending empty message")
             lv.append(ListItem(Label("Queue is empty 🎵")))
             return
 
+        log.info(f"[QueueView] Appending {len(new_val)} tracks to ListView")
         for i, track in enumerate(new_val):
             widget = QueueItemWidget(track)
-            # No static ID — let Textual auto-generate unique IDs to avoid all collisions
             item = ListItem(widget)
             item.track = track
             item.track_index = i
             lv.append(item)
             self.list_items.append(item)
 
+        log.info(f"[QueueView] Successfully populated ListView with {len(self.list_items)} items")
         self.highlight_current_track(self.current_index)
 
     def watch_current_index(self, new_val):
