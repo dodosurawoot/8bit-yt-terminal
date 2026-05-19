@@ -12,8 +12,9 @@ build:
 		--onefile \
 		--console \
 		--clean \
-		--add-data "yt_terminal/style.tcss:yt_terminal" \
-		--add-data "yt_terminal/assets:yt_terminal/assets" \
+		--collect-data ytmusicapi \
+		--add-data "yt_terminal/style.tcss:." \
+		--add-data "yt_terminal/assets:assets" \
 		yt_terminal/main.py
 
 clean:
