@@ -2,10 +2,13 @@ import asyncio
 import os
 import json
 import requests
+import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from ytmusicapi import YTMusic, OAuthCredentials
 from yt_terminal.config_manager import ConfigManager
+
+log = logging.getLogger("yt-terminal")
 
 class Track:
     """Unified Track representation for TUI player."""
@@ -43,12 +46,26 @@ class MusicService:
     
     def __init__(self):
         self.yt: Optional[YTMusic] = None
+        self.yt_public = YTMusic()  # Clean unauthenticated public fallback
         self._init_client()
 
     def _init_client(self):
         """Initializes the YTMusic client if credentials exist."""
         ConfigManager.ensure_dirs()
         if ConfigManager.is_authenticated():
+            # Self-healing OAUTH_FILE parse to strip unsupported 'refresh_token_expires_in' key
+            if ConfigManager.OAUTH_FILE.exists():
+                try:
+                    import json
+                    with open(ConfigManager.OAUTH_FILE, "r") as f:
+                        data = json.load(f)
+                    if isinstance(data, dict) and "refresh_token_expires_in" in data:
+                        del data["refresh_token_expires_in"]
+                        with open(ConfigManager.OAUTH_FILE, "w") as f:
+                            json.dump(data, f, indent=4)
+                except Exception:
+                    pass
+
             client_id, client_secret = ConfigManager.get_credentials()
             try:
                 if client_id and client_secret:
@@ -132,21 +149,32 @@ class MusicService:
             return []
 
     async def search(self, query: str, filter_type: str = "songs") -> List[Track]:
-        """Searches YouTube Music for tracks."""
-        if not self.yt:
-            return []
+        """Searches YouTube Music for tracks with robust public fallback."""
+        if self.yt:
+            try:
+                results = await asyncio.to_thread(self.yt.search, query, filter=filter_type, limit=20)
+                return self._parse_tracks(results)
+            except Exception as e:
+                log.warning(f"Authenticated search failed ({e}) — falling back to public client")
+
         try:
-            results = await asyncio.to_thread(self.yt.search, query, filter=filter_type, limit=20)
+            results = await asyncio.to_thread(self.yt_public.search, query, filter=filter_type, limit=20)
             return self._parse_tracks(results)
         except Exception:
             return []
 
     async def get_search_suggestions(self, query: str) -> List[str]:
-        """Gets autocomplete search recommendations from YouTube Music."""
-        if not self.yt or not query.strip():
+        """Gets autocomplete search recommendations with robust public fallback."""
+        if not query.strip():
             return []
+        if self.yt:
+            try:
+                return await asyncio.to_thread(self.yt.get_search_suggestions, query)
+            except Exception as e:
+                log.warning(f"Authenticated suggestions failed ({e}) — falling back to public client")
+        
         try:
-            return await asyncio.to_thread(self.yt.get_search_suggestions, query)
+            return await asyncio.to_thread(self.yt_public.get_search_suggestions, query)
         except Exception:
             return []
 
