@@ -1,9 +1,37 @@
-[tool.black]
-exclude = '''
-/(
-    .*/ui_main_window\.py|
-    .*/ui_settings_dialog\.py|
-    .*/ui_lyrics_dialog\.py|
-    .*/ui_comments_dialog\.py
-)$
-'''
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yt-terminal"
+version = "2.0.0"
+description = "A sleek, premium retro 8-bit YouTube Music player in the terminal."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Antigravity Dev Team"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+]
+dependencies = [
+    "textual>=0.50.0",
+    "colorthief>=0.2.1",
+    "pillow>=10.0.0",
+    "ytmusicapi>=1.12.0",
+    "yt-dlp>=2024.3.10",
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+yt-terminal = "yt_terminal.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["yt_terminal*"]
+
+[tool.setuptools.package-data]
+yt_terminal = ["style.tcss", "assets/*.png"]

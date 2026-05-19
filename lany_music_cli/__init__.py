@@ -1,1 +1,0 @@
-# LANY Music CLI package
