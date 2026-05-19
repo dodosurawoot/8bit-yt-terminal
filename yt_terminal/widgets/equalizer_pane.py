@@ -148,9 +148,9 @@ class SpectrumVisualizer(Widget):
                 val = self.bar_heights[i]
                 # Scale value to match current slice height
                 val_at_slice = val - h
-                if val_at_slice >= 1.0:
-                    row_chars.append(f"[{color}]█[/]")
-                elif val_at_slice >= 0.5:
+                if val_at_slice >= 0.5:
+                    # Renders a discrete half-block, leaving a beautiful vertical gap
+                    # between rows for a premium, authentic 8-bit LED segment look!
                     row_chars.append(f"[{color}]▄[/]")
                 else:
                     row_chars.append(" ")
