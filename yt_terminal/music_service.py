@@ -252,18 +252,49 @@ class MusicService:
             return []
 
     def _parse_lyrics_from_watch_and_text(self, watch_data: dict, text: str) -> List[Dict[str, Any]]:
-        """Utility helper to estimate line timings cleanly."""
+        """Utility helper to estimate line timings cleanly with LRC parser support."""
         if not text:
             return []
+            
+        import re
         lines = [line.strip() for line in text.split("\n") if line.strip()]
+        
+        # Check if lyrics contain LRC-style timestamps [mm:ss.xx] or [mm:ss]
+        lrc_pattern = re.compile(r"^\[(\d+):(\d+)(?:\.(\d+))?\](.*)$")
+        has_lrc = False
+        parsed_lines = []
+        
+        for line in lines:
+            match = lrc_pattern.match(line)
+            if match:
+                has_lrc = True
+                minutes = int(match.group(1))
+                seconds = int(match.group(2))
+                ms = int(match.group(3)) if match.group(3) else 0
+                start_time = minutes * 60 + seconds + (ms / 100.0 if ms < 100 else ms / 1000.0)
+                content = match.group(4).strip()
+                parsed_lines.append({
+                    "start": start_time,
+                    "text": content
+                })
+                
+        if has_lrc and parsed_lines:
+            parsed_lines.sort(key=lambda x: x["start"])
+            return parsed_lines
+            
+        # Fallback to smart estimated timeline with opening instrumental delay
         parsed_lines = []
         duration = watch_data.get("tracks", [{}])[0].get("duration_seconds", 180)
-        if not duration:
+        if not duration or duration <= 0:
             duration = 180
-        time_per_line = max(1.5, min(6.0, duration / max(1, len(lines))))
+            
+        # Apply a natural opening instrumental buffer (e.g., 8 seconds or 8% of song)
+        intro_delay = min(10.0, duration * 0.08)
+        usable_duration = max(30.0, duration - intro_delay)
+        time_per_line = max(1.5, min(6.0, usable_duration / max(1, len(lines))))
         
         for i, line in enumerate(lines):
-            start = i * time_per_line
+            start = intro_delay + (i * time_per_line)
             parsed_lines.append({
                 "start": start,
                 "text": line

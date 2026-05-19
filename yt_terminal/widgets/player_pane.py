@@ -105,12 +105,12 @@ class PlayerPane(Widget):
             
         # Unicode Media controls row
         with Horizontal(id="media-controls"):
-            yield Button("🔀", id="shuffle-btn")
+            yield Button("SHF", id="shuffle-btn")
             yield Button("⏮", id="prev-btn")
             self.play_btn = Button("⏸" if self.is_playing else "▶", id="play-btn")
             yield self.play_btn
             yield Button("⏭", id="next-btn")
-            yield Button("🔁", id="repeat-btn")
+            yield Button("RPT", id="repeat-btn")
 
     def watch_track_title(self, new_val):
         if hasattr(self, "title_lbl"):

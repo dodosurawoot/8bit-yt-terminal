@@ -247,6 +247,10 @@ class YTTerminalApp(App):
         pos = self.player.get_position()
         dur = self.player.get_duration() or self._current_track.duration_seconds
 
+        if dur and dur > 0:
+            self.track_duration = dur
+            self.player_pane.track_duration = dur
+
         # Buffer & Cooldown Protection Guard
         # During the first 8 seconds after loading, we filter out stale positions
         # and ignore auto-advance checks while mpv buffers the network stream.

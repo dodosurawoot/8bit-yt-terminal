@@ -188,6 +188,11 @@ AlbumArt {
 }
 
 /* EQ & Visualizer Styling */
+EqualizerWidget {
+    height: 13;
+    width: 100%;
+}
+
 .eq-title {
     color: $accent;
     text-style: bold;
