@@ -180,14 +180,12 @@ class SpectrumVisualizer(Widget):
             row_chars = []
             for i in range(self.num_bars):
                 val = self.bar_heights[i]
-                # Scale value to match current slice height
-                val_at_slice = val - h
-                if val_at_slice >= 0.5:
-                    # Renders a discrete half-block, leaving a beautiful vertical gap
-                    # between rows for a premium, authentic 8-bit LED segment look!
-                    row_chars.append(f"[{color}]▄[/]")
+                if val > h:
+                    # Solid chunky block for active 8-bit LED segments
+                    row_chars.append(f"[{color}]█[/]")
                 else:
-                    row_chars.append(" ")
+                    # Low-contrast background cell for authentic 8-bit grid display panel
+                    row_chars.append("[#231821]░[/]")
             rows.append("".join(row_chars))
             
         return Text.from_markup("\n".join(rows))
