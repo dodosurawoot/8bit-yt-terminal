@@ -3,3 +3,4 @@ YTMDPlayer.dist
 *.md
 *.txt
 Implementation_plan.md
+.DS_Store
