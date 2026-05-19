@@ -247,15 +247,24 @@ class YTTerminalApp(App):
         pos = self.player.get_position()
         dur = self.player.get_duration() or self._current_track.duration_seconds
 
-        if dur and dur > 0:
+        # Avoid temporary 0.0 read glitches from mpv during stream buffering
+        if pos == 0.0 and self.current_time > 2.0:
+            now = time.time()
+            if not (hasattr(self, '_last_track_load_time') and (now - self._last_track_load_time) < 8.0):
+                pos = self.current_time
+
+        # Only update live duration if we are out of the 8-second initial loading period
+        now = time.time()
+        is_loading = hasattr(self, '_last_track_load_time') and (now - self._last_track_load_time) < 8.0
+
+        if not is_loading and dur and dur > 0:
             self.track_duration = dur
             self.player_pane.track_duration = dur
 
         # Buffer & Cooldown Protection Guard
         # During the first 8 seconds after loading, we filter out stale positions
         # and ignore auto-advance checks while mpv buffers the network stream.
-        now = time.time()
-        if hasattr(self, '_last_track_load_time') and (now - self._last_track_load_time) < 8.0:
+        if is_loading:
             if pos > 5.0:
                 # Stale position from previous track while mpv buffers the new stream
                 pos = 0.0
