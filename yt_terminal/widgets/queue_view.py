@@ -49,6 +49,10 @@ class QueueView(Widget):
         yield ListView(id="queue-list")
         self.list_items = []
 
+    def on_mount(self) -> None:
+        """Called when the widget is mounted. Populates the queue if data is already loaded."""
+        self.run_worker(self.watch_queue_data(self.queue_data))
+
     async def watch_queue_data(self, new_val):
         """Reactively updates the visual list when queue changes."""
         try:
