@@ -75,14 +75,32 @@ class SpectrumVisualizer(Widget):
     
     # Visualizer state
     anim_active = reactive(True)
+    current_style = reactive(0) # 0: Chunky LED Grid, 1: HUD Mirrored, 2: Analog Wave, 3: Digital Solid
 
     def on_mount(self) -> None:
-        self.border_title = "Visualizer"
         self.num_bars = 12
         self.bar_heights = [0 for _ in range(self.num_bars)]
         self.peak_heights = [0 for _ in range(self.num_bars)]
         self.peak_delays = [0 for _ in range(self.num_bars)]
         self.set_interval(0.08, self.animate_spectrum)
+        self.update_border_title()
+
+    def watch_current_style(self, new_style: int) -> None:
+        """Observe style reactive change to update border title automatically."""
+        self.update_border_title()
+
+    def update_border_title(self) -> None:
+        style_names = {
+            0: "Chunky LED Grid",
+            1: "HUD Mirrored",
+            2: "Analog Wave",
+            3: "Digital Solid"
+        }
+        self.border_title = f"Visualizer ({style_names.get(self.current_style, 'Chunky LED Grid')}) • Click to Toggle"
+
+    def on_click(self, event=None) -> None:
+        """Cycle visualizer style on mouse click."""
+        self.current_style = (self.current_style + 1) % 4
 
     def animate_spectrum(self) -> None:
         max_height = 6
@@ -156,7 +174,7 @@ class SpectrumVisualizer(Widget):
                     self.peak_heights[i] = max(0, self.peak_heights[i] - 1)
                 self.refresh()
                 return
-            
+
         # Distribute RMS power across 12 bands with dynamic peak weighting
         for i in range(self.num_bars):
             if i < 3:
@@ -193,37 +211,111 @@ class SpectrumVisualizer(Widget):
         self.refresh()
 
     def render(self) -> Text:
-        max_height = 6  # 6 vertical steps for high-res spectrum mapping
+        max_height = 6
         rows = []
         
-        for h in range(max_height - 1, -1, -1):
-            # Dynamic Winamp classic green-yellow-orange-red color spectrum gradient
-            if h >= 4:
-                color = "rgb(240,80,80)"  # Red peaks (Rows 4-5)
-            elif h >= 3:
-                color = "rgb(248,140,50)" # Orange mids (Row 3)
-            elif h >= 1:
-                color = "rgb(250,210,50)" # Yellow low-mids (Rows 1-2)
-            else:
-                color = "rgb(50,220,100)"  # Green bass base (Row 0)
-                
-            row_chars = []
-            for i in range(self.num_bars):
-                val = self.bar_heights[i]
-                peak = self.peak_heights[i]
-                
-                if val > h:
-                    # Solid chunky block for active 8-bit LED segments
-                    row_chars.append(f"[{color}]█[/]")
-                elif peak == h and peak > 0:
-                    # Floating top peak dot (Winamp style high-contrast rose pop!)
-                    row_chars.append("[#ffa8b0]▀[/]")
+        # Style 0: Chunky Winamp-style LED grid (Classic)
+        if self.current_style == 0:
+            for h in range(max_height - 1, -1, -1):
+                if h >= 4:
+                    color = "rgb(240,80,80)"  # Red peaks (Rows 4-5)
+                elif h >= 3:
+                    color = "rgb(248,140,50)" # Orange mids (Row 3)
+                elif h >= 1:
+                    color = "rgb(250,210,50)" # Yellow low-mids (Rows 1-2)
                 else:
-                    # Subtle low-contrast background cell for hardware grid panel
-                    row_chars.append("[#3a2230]░[/]")
+                    color = "rgb(50,220,100)"  # Green bass base (Row 0)
                     
-            rows.append(" ".join(row_chars))
-            
+                row_chars = []
+                for i in range(self.num_bars):
+                    val = self.bar_heights[i]
+                    peak = self.peak_heights[i]
+                    
+                    if val > h:
+                        row_chars.append(f"[{color}]█[/]")
+                    elif peak == h and peak > 0:
+                        row_chars.append("[#ffa8b0]▀[/]")
+                    else:
+                        row_chars.append("[#3a2230]░[/]")
+                        
+                rows.append(" ".join(row_chars))
+                
+        # Style 1: HUD Mirrored (Symmetric up & down from center baseline)
+        elif self.current_style == 1:
+            for h in range(max_height - 1, -1, -1):
+                row_chars = []
+                for i in range(self.num_bars):
+                    v = self.bar_heights[i]
+                    active_height = int(v / 2) # Maps 0..6 to 0..3 active blocks
+                    
+                    # Colors for high-tech HUD mirrored styling
+                    if h == 5 or h == 0:
+                        color = "#00f3ff"  # Electric Cyan (Outer bands)
+                    elif h == 4 or h == 1:
+                        color = "#00a8ff"  # Neon Blue (Mid bands)
+                    else:
+                        color = "#0055ff"  # Deep HUD Blue (Inner bands)
+                        
+                    if h >= 3:
+                        idx = h - 3
+                        if active_height > idx:
+                            row_chars.append(f"[{color}]█[/]")
+                        elif h == 3:
+                            row_chars.append(f"[{color}]▄[/]")
+                        else:
+                            row_chars.append("[#15223c]·[/]")
+                    else:
+                        idx = 2 - h
+                        if active_height > idx:
+                            row_chars.append(f"[{color}]█[/]")
+                        elif h == 2:
+                            row_chars.append(f"[{color}]▀[/]")
+                        else:
+                            row_chars.append("[#15223c]·[/]")
+                            
+                rows.append(" ".join(row_chars))
+
+        # Style 2: Continuous Analog Oscilloscope (CRT radar scrolling wave)
+        elif self.current_style == 2:
+            interp_heights = [0.0] * 23
+            for x in range(23):
+                if x % 2 == 0:
+                    interp_heights[x] = float(self.bar_heights[x // 2])
+                else:
+                    left = float(self.bar_heights[x // 2])
+                    right = float(self.bar_heights[x // 2 + 1]) if (x // 2 + 1) < 12 else left
+                    interp_heights[x] = (left + right) / 2.0
+                    
+            for h in range(max_height - 1, -1, -1):
+                row_chars = []
+                for x in range(23):
+                    wave_h = int(interp_heights[x])
+                    if wave_h == h:
+                        row_chars.append("[#00ff66]█[/]")
+                    else:
+                        row_chars.append("[#10301a]·[/]")
+                rows.append("".join(row_chars))
+
+        # Style 3: Digital Solid (Golden amber block columns)
+        elif self.current_style == 3:
+            for h in range(max_height - 1, -1, -1):
+                if h >= 4:
+                    color = "#ff9100"  # Amber Orange (Rows 4-5)
+                elif h >= 2:
+                    color = "#ffc400"  # Warm Yellow (Rows 2-3)
+                else:
+                    color = "#ffea00"  # Neon Yellow (Rows 0-1)
+                    
+                row_chars = []
+                for i in range(self.num_bars):
+                    val = self.bar_heights[i]
+                    if val > h:
+                        row_chars.append(f"[{color}]█[/]")
+                    else:
+                        row_chars.append("[#221a0f]·[/]")
+                        
+                rows.append(" ".join(row_chars))
+                
         return Text.from_markup("\n".join(rows))
 
 class EqualizerPane(Widget):

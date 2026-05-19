@@ -237,15 +237,24 @@ EqualizerWidget {
 
 #vis-container {
     width: 100%;
-    height: 8; /* Compact roomy space for spectrum visualizer */
+    height: 10; /* Roomy space for bordered spectrum visualizer */
     margin-top: 1;
     padding: 0;
 }
 
 SpectrumVisualizer {
+    border: round $border;
+    border-title-align: center;
+    border-title-color: $accent;
     width: 100%;
-    height: 6;
-    content-align: center middle; /* Perfectly center the chunky LED columns */
+    height: 8; /* 6 lines of render + 2 border rows = 8 */
+    content-align: center middle; /* Perfectly center the dynamic columns */
+    background: transparent;
+}
+
+SpectrumVisualizer:hover {
+    border: round $accent;
+    border-title-color: $text-primary;
 }
 
 #eq-vis-toggle {
