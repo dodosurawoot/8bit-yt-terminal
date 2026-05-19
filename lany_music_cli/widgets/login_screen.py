@@ -13,21 +13,21 @@ class LoginScreen(Screen):
     DEFAULT_CSS = """
     LoginScreen {
         align: center middle;
-        background: $background 50%;
+        background: #432832 50%;
     }
 
     #login-box {
         width: 60;
         height: auto;
-        border: thick $primary;
-        background: $panel-bg;
+        border: thick #7a5260;
+        background: #4f313c;
         padding: 2;
-        border-title-color: $accent;
+        border-title-color: #d38e91;
     }
 
     .login-title {
         text-align: center;
-        color: $accent;
+        color: #d38e91;
         text-style: bold;
         margin-bottom: 1;
     }
@@ -35,17 +35,17 @@ class LoginScreen(Screen):
     .login-desc {
         text-align: center;
         margin-bottom: 2;
-        color: $text-muted;
+        color: #a68894;
     }
 
     .login-field-lbl {
         margin-top: 1;
-        color: $text-primary;
+        color: #fbe5e6;
     }
 
     .login-field {
         margin-bottom: 1;
-        border: tall $border;
+        border: tall #7a5260;
     }
 
     #btn-container {
@@ -55,37 +55,37 @@ class LoginScreen(Screen):
 
     .action-btn {
         width: 100%;
-        background: $accent;
-        color: $text-primary;
+        background: #d38e91;
+        color: #fbe5e6;
     }
 
     #oauth-details-box {
-        border: dashed $border;
+        border: dashed #7a5260;
         padding: 1 2;
         margin-top: 1;
         margin-bottom: 1;
-        background: $background;
+        background: #432832;
         align: center middle;
     }
 
     .oauth-url {
         text-style: underline;
-        color: $accent;
+        color: #d38e91;
         text-align: center;
     }
 
     .oauth-code {
         text-align: center;
         text-style: bold;
-        color: $text-primary;
-        background: $primary-bg;
+        color: #fbe5e6;
+        background: #432832;
         padding: 1 3;
         margin: 1 0;
     }
 
     .status-msg {
         text-align: center;
-        color: $accent;
+        color: #d38e91;
         margin-top: 1;
     }
     """

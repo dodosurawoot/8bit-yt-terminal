@@ -16,28 +16,28 @@ class SearchOverlay(Screen):
     #search-box {
         width: 70;
         height: 25;
-        border: thick $primary;
-        background: $panel-bg;
+        border: thick #7a5260;
+        background: #4f313c;
         padding: 1 2;
     }
 
     .search-title {
         text-align: center;
-        color: $accent;
+        color: #d38e91;
         text-style: bold;
         margin-bottom: 1;
     }
 
     #search-input {
         margin-bottom: 1;
-        border: tall $border;
-        color: $text-primary;
+        border: tall #7a5260;
+        color: #fbe5e6;
     }
 
     #search-results-list {
         height: 14;
-        background: $background;
-        border: solid $border;
+        background: #432832;
+        border: solid #7a5260;
         scrollbar-size: 1;
     }
 
@@ -49,19 +49,19 @@ class SearchOverlay(Screen):
 
     .search-item-title {
         width: 40%;
-        color: $text-primary;
+        color: #fbe5e6;
         text-overflow: ellipsis;
     }
 
     .search-item-artist {
         width: 35%;
-        color: $text-muted;
+        color: #a68894;
         text-overflow: ellipsis;
     }
 
     .search-item-album {
         width: 25%;
-        color: $text-muted;
+        color: #a68894;
         text-overflow: ellipsis;
         text-align: right;
     }
