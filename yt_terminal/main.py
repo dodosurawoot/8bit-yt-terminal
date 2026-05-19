@@ -45,6 +45,7 @@ class YTTerminalApp(App):
         Binding("p", "prev_track", "Prev Track", show=True),
         Binding("l", "toggle_lyrics_fullscreen", "Full Lyrics", show=True),
         Binding("slash", "search_overlay", "Search", show=True),
+        Binding("a", "sync_account", "Sync Account", show=True),
         Binding("q", "quit", "Quit Player", show=True),
     ]
     
@@ -301,6 +302,21 @@ class YTTerminalApp(App):
             layout.toggle_class("fullscreen-lyrics-active")
         except Exception:
             pass
+
+    def action_sync_account(self) -> None:
+        """Triggers manual YouTube Music authentication / Re-sync screen."""
+        log.info("User triggered manual sync / login screen")
+        # Pause active player first if playing to release audio device resources
+        if self.player:
+            try:
+                self.player.set_pause(True)
+                self.is_playing = False
+                self.player_pane.is_playing = False
+                self.eq_pane.visualizer.anim_active = False
+            except Exception:
+                pass
+        
+        self.push_screen(LoginScreen(self.ms), callback=self.on_login_completed)
 
     def action_quit(self) -> None:
         """Terminates background play processes safely before exiting."""
