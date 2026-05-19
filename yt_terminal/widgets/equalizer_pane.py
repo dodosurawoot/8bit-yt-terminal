@@ -196,16 +196,6 @@ class SpectrumVisualizer(Widget):
         max_height = 6  # 6 vertical steps for high-res spectrum mapping
         rows = []
         
-        # Center alignment padding based on container width
-        try:
-            width = self.size.width
-        except Exception:
-            width = 34
-            
-        # Total columns string is 12 columns joined by 1 space = 23 characters
-        pad_len = max(0, (width - 23) // 2)
-        indent = " " * pad_len
-        
         for h in range(max_height - 1, -1, -1):
             # Dynamic Winamp classic green-yellow-orange-red color spectrum gradient
             if h >= 4:
@@ -232,23 +222,15 @@ class SpectrumVisualizer(Widget):
                     # Subtle low-contrast background cell for hardware grid panel
                     row_chars.append("[#3a2230]░[/]")
                     
-            rows.append(indent + " ".join(row_chars))
+            rows.append(" ".join(row_chars))
             
         return Text.from_markup("\n".join(rows))
 
 class EqualizerPane(Widget):
     """The complete Center Pane wrapping EQ sliders, spectrum, and tabs."""
     
-    # Track the active toggle tab ("equalizer" or "visualizer")
-    active_tab = reactive("equalizer")
-    
-    BINDINGS = [
-        ("tab", "toggle_tab", "Toggle View"),
-        ("v", "toggle_tab", "Toggle View"),
-    ]
-    
     def compose(self):
-        self.border_title = "Equalizer & Visualizer"
+        self.border_title = "Equalizer"
         
         # Upper EQ panel
         self.eq_widget = EqualizerWidget()
@@ -260,49 +242,5 @@ class EqualizerPane(Widget):
             yield self.visualizer
             
         # Navigation toggle tab row
-        with Horizontal(id="eq-vis-toggle"):
-            self.eq_tab = Label("🎛 EQUALIZER", id="toggle-eq", classes="toggle-btn active")
-            self.vis_tab = Label("⚡ VISUALIZER", id="toggle-vis", classes="toggle-btn")
-            yield self.eq_tab
-            yield self.vis_tab
-
-    def watch_active_tab(self, active_tab: str) -> None:
-        """Triggers UI visual updates when active tab changes."""
-        self.update_tab_visibility()
-
-    def on_mount(self) -> None:
-        """Initialise panel visibility defaults."""
-        self.update_tab_visibility()
-
-    def update_tab_visibility(self) -> None:
-        """Controls dynamic layout displays of central sub-widgets."""
-        if not hasattr(self, "eq_widget") or not hasattr(self, "visualizer") or not hasattr(self, "eq_tab"):
-            return
-            
-        if self.active_tab == "equalizer":
-            self.eq_widget.display = True
-            self.visualizer.display = False
-            self.eq_tab.add_class("active")
-            self.vis_tab.remove_class("active")
-        else:
-            self.eq_widget.display = False
-            self.visualizer.display = True
-            self.eq_tab.remove_class("active")
-            self.vis_tab.add_class("active")
-
-    def on_click(self, event) -> None:
-        """Handles mouse-click actions on tab labels."""
-        target_id = event.target.id
-        if target_id == "toggle-eq":
-            self.active_tab = "equalizer"
-            event.stop()
-        elif target_id == "toggle-vis":
-            self.active_tab = "visualizer"
-            event.stop()
-
-    def action_toggle_tab(self) -> None:
-        """Hotkey binding action to cycle tabs via keyboard."""
-        if self.active_tab == "equalizer":
-            self.active_tab = "visualizer"
-        else:
-            self.active_tab = "equalizer"
+        with Center(id="eq-vis-toggle"):
+            yield Label("Visualizer", classes="toggle-btn active")

@@ -245,7 +245,7 @@ EqualizerWidget {
 SpectrumVisualizer {
     width: 100%;
     height: 6;
-    content-align: center middle; /* Perfectly center the 28-column spectrum bars */
+    content-align: center middle; /* Perfectly center the chunky LED columns */
 }
 
 #eq-vis-toggle {
