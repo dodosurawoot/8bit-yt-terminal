@@ -22,9 +22,19 @@ class LyricsView(Widget):
         """Reactively updates the lyrics screen when the track data updates."""
         if not hasattr(self, "lyric_labels"):
             return
-            
-        container = self.query_one("#lyrics-scroll-container")
-        await container.query("*").remove()
+
+        try:
+            container = self.query_one("#lyrics-scroll-container")
+        except Exception:
+            return
+
+        # Safely remove existing lyrics labels
+        try:
+            for lbl in list(self.lyric_labels):
+                await lbl.remove()
+        except Exception:
+            pass
+
         self.lyric_labels = []
         
         if not new_val:

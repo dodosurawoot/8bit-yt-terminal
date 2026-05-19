@@ -28,6 +28,7 @@ class QueueView(Widget):
     """Displays the upcoming tracks queue list."""
     queue_data = reactive([])  # List of Track objects
     current_index = reactive(0)
+    _update_counter = 0  # Unique ID counter to avoid DuplicateIds
 
     def compose(self):
         self.border_title = "Up Next / AutoPlay"
@@ -45,7 +46,11 @@ class QueueView(Widget):
         except Exception:
             # Widget not fully composed yet
             return
-            
+
+        # Increment counter to generate unique IDs across updates
+        QueueView._update_counter += 1
+        batch = QueueView._update_counter
+
         lv.clear()
         self.list_items = []
         
@@ -55,7 +60,8 @@ class QueueView(Widget):
 
         for i, track in enumerate(new_val):
             widget = QueueItemWidget(track)
-            item = ListItem(widget, id=f"queue-track-{i}")
+            # Use batch counter in ID to guarantee uniqueness
+            item = ListItem(widget, id=f"qt-{batch}-{i}")
             item.track = track
             item.track_index = i
             lv.append(item)

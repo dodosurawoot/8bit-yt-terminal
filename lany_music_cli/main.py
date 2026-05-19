@@ -47,12 +47,13 @@ class LanyMusicApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.ms = MusicService()
-        self.player = AudioPlayer()
+        self.player: AudioPlayer | None = None  # Lazy init after login
         self.queue: list[Track] = []
         self._current_track: Track | None = None
         self._asset_task = None
         self._lyrics_task = None
         self._queue_task = None
+        self._skip_autoplay_update = False  # Prevent double queue race
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -90,6 +91,10 @@ class LanyMusicApp(App):
 
     async def initialize_library(self):
         """Fetches initial library tracks (Liked Songs) to populate queue."""
+        # Lazy-init AudioPlayer here (after login, not on import)
+        if self.player is None:
+            self.player = AudioPlayer()
+
         self.title = "LANY Music CLI > Loading Liked Songs... 🎵"
         
         # Load up to 40 tracks from user Liked library
@@ -102,6 +107,8 @@ class LanyMusicApp(App):
         if liked_tracks:
             self.queue = liked_tracks
             self.queue_view.queue_data = self.queue
+            # Skip autoplay queue update on first load to prevent double update race
+            self._skip_autoplay_update = True
             self.load_track(0)
         else:
             self.title = "LANY Music CLI > Ready (Press / to search)"
@@ -122,7 +129,11 @@ class LanyMusicApp(App):
         self._cancel_background_tasks()
         self._asset_task = self.run_worker(self.update_track_theme_and_artwork(track))
         self._lyrics_task = self.run_worker(self.update_track_lyrics(track))
-        self._queue_task = self.run_worker(self.update_autoplay_queue(track))
+        # Only update autoplay queue if not skipped (avoids double-update DuplicateIds)
+        if self._skip_autoplay_update:
+            self._skip_autoplay_update = False
+        else:
+            self._queue_task = self.run_worker(self.update_autoplay_queue(track))
         
         # Update left Player widget info
         self.player_pane.track_title = track.title
@@ -134,7 +145,8 @@ class LanyMusicApp(App):
         self.player_pane.artwork_path = DEFAULT_ART_PATH
         
         # Stream URL via background mpv process
-        self.player.play_url(f"https://www.youtube.com/watch?v={track.video_id}")
+        if self.player:
+            self.player.play_url(f"https://www.youtube.com/watch?v={track.video_id}")
         
         # Sync widget reactives
         self.current_time = 0.0
@@ -193,6 +205,8 @@ class LanyMusicApp(App):
         if not self.is_playing or not self._current_track:
             return
             
+        if not self.player:
+            return
         pos = self.player.get_position()
         dur = self.player.get_duration() or self._current_track.duration_seconds
         
@@ -208,7 +222,8 @@ class LanyMusicApp(App):
 
     def action_toggle_play(self) -> None:
         self.is_playing = not self.is_playing
-        self.player.set_pause(not self.is_playing)
+        if self.player:
+            self.player.set_pause(not self.is_playing)
         self.player_pane.is_playing = self.is_playing
         self.eq_pane.visualizer.anim_active = self.is_playing
 
@@ -228,7 +243,8 @@ class LanyMusicApp(App):
 
     def action_quit(self) -> None:
         """Terminates background play processes safely before exiting."""
-        self.player.quit()
+        if self.player:
+            self.player.quit()
         self.exit()
 
     # --- Widget Event Listeners ---
