@@ -167,6 +167,13 @@ class LoginScreen(Screen):
                 self.query_one("#verification-url-lbl", Label).update(code_data["verification_url"])
                 self.query_one("#user-code-lbl", Label).update(f"  {code_data['user_code']}  ")
                 self.query_one("#polling-status-lbl", Label).update("Waiting for your authorization... ⏳")
+
+                # Automatically open default system web browser to verification URL
+                try:
+                    import webbrowser
+                    webbrowser.open(code_data["verification_url"])
+                except Exception:
+                    pass
                 
                 # Hide input fields to clean up display
                 self.query_one("#client-id-input").display = False
