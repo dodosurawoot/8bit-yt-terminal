@@ -1,4 +1,5 @@
 # 📻 YT-Terminal v3.0
+
 > A premium, highly-polished terminal YouTube Music player inspired by Apple Music UI, featuring 8-bit retro album art, scrolling timed spotlight lyrics, and a classic Winamp-style spectrum visualizer.
 
 <p align="center">
@@ -7,7 +8,9 @@
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-E8959A?style=for-the-badge" alt="Platform Supported"/>
 </p>
 
----
+<p align="center">
+  <img src="yt_terminal_concept_1779199492721.png" alt="YT-Terminal v3.0" width="50%" height="auto"/>
+</p>
 
 ## ✨ Features
 
@@ -29,25 +32,28 @@
 
 Quickly control your YT-Terminal player using built-in global bindings:
 
-| Hotkey | Action |
-|--------|--------|
-| <kbd>Space</kbd> | Toggle Play / Pause |
-| <kbd>n</kbd> | Next Track |
-| <kbd>p</kbd> | Previous Track |
-| <kbd>l</kbd> | Toggle Immersive Full-Screen Lyrics Mode |
-| <kbd>/</kbd> | Open Search Overlay |
-| <kbd>q</kbd> | Safe Quit (cleanly terminates background `mpv` socket) |
+| Hotkey           | Action                                                 |
+| ---------------- | ------------------------------------------------------ |
+| <kbd>Space</kbd> | Toggle Play / Pause                                    |
+| <kbd>n</kbd>     | Next Track                                             |
+| <kbd>p</kbd>     | Previous Track                                         |
+| <kbd>l</kbd>     | Toggle Immersive Full-Screen Lyrics Mode               |
+| <kbd>/</kbd>     | Open Search Overlay                                    |
+| <kbd>q</kbd>     | Safe Quit (cleanly terminates background `mpv` socket) |
 
 ---
 
 ## 🚀 Installation & Running
 
 ### Prerequisites
+
 Make sure you have **`mpv`** installed on your system (which is used as the high-performance background audio backend):
+
 - **macOS**: `brew install mpv`
 - **Linux**: `sudo apt install mpv` / `sudo dnf install mpv`
 
 ### Running from Source
+
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/dodosurawoot/8bit-yt-terminal.git
@@ -65,18 +71,23 @@ Make sure you have **`mpv`** installed on your system (which is used as the high
    ```
 
 ### First-Time Google Login
+
 On your first run, a secure terminal authentication dialog will display a Google authorization link and a short device pairing code. Visit the link, enter the code, and confirm access. The app will securely cache your token and initialize your Liked Songs library!
 
 ---
 
 ## 📦 Building a Desktop Release
+
 To build a standalone desktop executable target using PyInstaller:
+
 ```bash
 make build
 ```
+
 This generates a single-file executable at `dist/YT-Terminal` containing all assets and visual styles.
 
 ---
 
 ## 📝 Disclaimer
+
 This application is unofficial and not affiliated with YouTube or Google Inc. All "YouTube", "YouTube Music", and brand assets are properties of their respective owners.
