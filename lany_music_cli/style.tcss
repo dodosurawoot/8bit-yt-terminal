@@ -14,7 +14,6 @@ $border: #7a5260;
 Screen {
     background: $primary-bg;
     color: $text-primary;
-    font-family: monospace;
 }
 
 #main-layout {
@@ -222,7 +221,6 @@ AlbumArt {
 .eq-label {
     text-align: center;
     color: $text-muted;
-    font-size: 8;
     height: 1;
 }
 
@@ -285,7 +283,7 @@ AlbumArt {
     width: 100%;
     padding: 0 1;
     margin-bottom: 1;
-    border-bottom: thin $border;
+    border-bottom: solid $border;
 }
 
 .queue-thumb {
