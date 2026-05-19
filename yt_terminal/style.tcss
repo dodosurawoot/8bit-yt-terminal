@@ -75,6 +75,7 @@ Screen {
     border-title-color: $accent;
     border-title-style: bold;
     padding: 0 1;
+    layout: vertical;
 }
 
 /* Left Pane Widgets styling */
@@ -231,14 +232,14 @@ AlbumArt {
 
 #vis-container {
     width: 100%;
-    height: 10; /* Roomy high-density space for spectrum visualizer */
+    height: 8; /* Compact roomy space for spectrum visualizer */
     margin-top: 1;
     padding: 0;
 }
 
 SpectrumVisualizer {
     width: 100%;
-    height: 8;
+    height: 6;
     content-align: center middle; /* Perfectly center the 28-column spectrum bars */
 }
 
@@ -290,6 +291,11 @@ SpectrumVisualizer {
     background: transparent;
     padding: 0;
     margin: 0;
+}
+
+QueueItemWidget {
+    height: 2;
+    width: 100%;
 }
 
 .queue-item {

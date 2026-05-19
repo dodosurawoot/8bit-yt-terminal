@@ -82,6 +82,7 @@ class SpectrumVisualizer(Widget):
         self.set_interval(0.08, self.animate_spectrum)
 
     def animate_spectrum(self) -> None:
+        max_height = 6
         if not self.anim_active:
             # Graceful decay when paused
             for i in range(self.num_bars):
@@ -97,51 +98,84 @@ class SpectrumVisualizer(Widget):
             except Exception:
                 pass
 
+        is_playing = False
+        if hasattr(self, "app") and self.app and hasattr(self.app, "is_playing"):
+            is_playing = self.app.is_playing
+
         if amp <= 0.0:
-            # Silent parts decay columns gracefully
-            for i in range(self.num_bars):
-                self.bar_heights[i] = max(0, self.bar_heights[i] - 1)
-            self.refresh()
-            return
+            if is_playing:
+                # Organic multi-band procedural simulation fallback!
+                import time
+                import math
+                t = time.time()
+                for i in range(self.num_bars):
+                    # Rolling wave combined with high-frequency noise
+                    val = 2.0 + 1.5 * math.sin(t * 3.5 + i * 0.45)
+                    val += 1.0 * math.sin(t * 9.0 - i * 0.7)
+                    
+                    # Bass emphasis on left 8 columns
+                    if i < 8:
+                        val += 1.2 * (1.0 + math.sin(t * 6.5))
+                    # Midrange emphasis on center 12 columns
+                    elif i < 20:
+                        val += 0.8 * (1.0 + math.cos(t * 5.0))
+                    # Treble hiss on right 8 columns
+                    else:
+                        val += 0.8 * random.random()
+                        
+                    target = int(max(0, min(max_height, val)))
+                    current = self.bar_heights[i]
+                    if current < target:
+                        self.bar_heights[i] = min(max_height, current + 2)
+                    else:
+                        self.bar_heights[i] = max(0, current - 1)
+                self.refresh()
+                return
+            else:
+                # Silent parts decay columns gracefully
+                for i in range(self.num_bars):
+                    self.bar_heights[i] = max(0, self.bar_heights[i] - 1)
+                self.refresh()
+                return
             
         # Distribute RMS power across 28 bands with dynamic peak weighting
         for i in range(self.num_bars):
             if i < 6:
-                weight = 1.4  # Sub-Bass/Bass
+                weight = 1.2  # Sub-Bass/Bass
             elif i < 12:
-                weight = 1.1  # Mid-Bass
+                weight = 0.9  # Mid-Bass
             elif i < 20:
-                weight = 0.8  # Vocals/Mids
+                weight = 0.7  # Vocals/Mids
             else:
-                weight = 0.5  # Presence/Highs
+                weight = 0.4  # Presence/Highs
                 
             # Add dynamic, smooth organic noise to simulate authentic multi-band movement
             fluctuation = random.uniform(-0.1, 0.1)
             target = int((amp * weight + fluctuation) * 10)
-            target = max(0, min(8, target))
+            target = max(0, min(max_height, target))
             
             current = self.bar_heights[i]
             if current < target:
-                self.bar_heights[i] = min(8, current + 2) # fast rise
+                self.bar_heights[i] = min(max_height, current + 2) # fast rise
             else:
                 self.bar_heights[i] = max(0, current - 1) # smooth analog decay
                 
         self.refresh()
 
     def render(self) -> Text:
-        max_height = 8  # 8 vertical steps for high-res spectrum mapping
+        max_height = 6  # 6 vertical steps for high-res spectrum mapping
         rows = []
         
         for h in range(max_height - 1, -1, -1):
             # Dynamic Winamp classic green-yellow-orange-red color spectrum gradient
-            if h >= 6:
-                color = "rgb(240,80,80)"  # Red peaks (Rows 6-7)
-            elif h >= 4:
-                color = "rgb(248,140,50)" # Orange mids (Rows 4-5)
-            elif h >= 2:
-                color = "rgb(250,210,50)" # Yellow low-mids (Rows 2-3)
+            if h >= 4:
+                color = "rgb(240,80,80)"  # Red peaks (Rows 4-5)
+            elif h >= 3:
+                color = "rgb(248,140,50)" # Orange mids (Row 3)
+            elif h >= 1:
+                color = "rgb(250,210,50)" # Yellow low-mids (Rows 1-2)
             else:
-                color = "rgb(50,220,100)"  # Green bass base (Rows 0-1)
+                color = "rgb(50,220,100)"  # Green bass base (Row 0)
                 
             row_chars = []
             for i in range(self.num_bars):
