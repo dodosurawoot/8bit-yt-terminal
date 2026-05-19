@@ -77,8 +77,10 @@ class SpectrumVisualizer(Widget):
 
     def on_mount(self) -> None:
         self.border_title = "Visualizer"
-        self.num_bars = 28
+        self.num_bars = 12
         self.bar_heights = [0 for _ in range(self.num_bars)]
+        self.peak_heights = [0 for _ in range(self.num_bars)]
+        self.peak_delays = [0 for _ in range(self.num_bars)]
         self.set_interval(0.08, self.animate_spectrum)
 
     def animate_spectrum(self) -> None:
@@ -87,6 +89,7 @@ class SpectrumVisualizer(Widget):
             # Graceful decay when paused
             for i in range(self.num_bars):
                 self.bar_heights[i] = max(0, self.bar_heights[i] - 1)
+                self.peak_heights[i] = max(0, self.peak_heights[i] - 1)
             self.refresh()
             return
             
@@ -110,16 +113,16 @@ class SpectrumVisualizer(Widget):
                 t = time.time()
                 for i in range(self.num_bars):
                     # Rolling wave combined with high-frequency noise
-                    val = 2.0 + 1.5 * math.sin(t * 3.5 + i * 0.45)
-                    val += 1.0 * math.sin(t * 9.0 - i * 0.7)
+                    val = 2.0 + 1.5 * math.sin(t * 3.5 + i * 0.9)
+                    val += 1.0 * math.sin(t * 9.0 - i * 1.4)
                     
-                    # Bass emphasis on left 8 columns
-                    if i < 8:
+                    # Bass emphasis on left 3 columns
+                    if i < 3:
                         val += 1.2 * (1.0 + math.sin(t * 6.5))
-                    # Midrange emphasis on center 12 columns
-                    elif i < 20:
+                    # Midrange emphasis on center 6 columns
+                    elif i < 9:
                         val += 0.8 * (1.0 + math.cos(t * 5.0))
-                    # Treble hiss on right 8 columns
+                    # Treble hiss on right 3 columns
                     else:
                         val += 0.8 * random.random()
                         
@@ -129,25 +132,38 @@ class SpectrumVisualizer(Widget):
                         self.bar_heights[i] = min(max_height, current + 2)
                     else:
                         self.bar_heights[i] = max(0, current - 1)
+                
+                # Update floating peaks
+                for i in range(self.num_bars):
+                    cur = self.bar_heights[i]
+                    pk = self.peak_heights[i]
+                    if cur > pk:
+                        self.peak_heights[i] = cur
+                        self.peak_delays[i] = 4
+                    else:
+                        if self.peak_delays[i] > 0:
+                            self.peak_delays[i] -= 1
+                        else:
+                            self.peak_heights[i] = max(0, pk - 1)
+                            
                 self.refresh()
                 return
             else:
                 # Silent parts decay columns gracefully
                 for i in range(self.num_bars):
                     self.bar_heights[i] = max(0, self.bar_heights[i] - 1)
+                    self.peak_heights[i] = max(0, self.peak_heights[i] - 1)
                 self.refresh()
                 return
             
-        # Distribute RMS power across 28 bands with dynamic peak weighting
+        # Distribute RMS power across 12 bands with dynamic peak weighting
         for i in range(self.num_bars):
-            if i < 6:
-                weight = 1.2  # Sub-Bass/Bass
-            elif i < 12:
-                weight = 0.9  # Mid-Bass
-            elif i < 20:
-                weight = 0.7  # Vocals/Mids
+            if i < 3:
+                weight = 1.3  # Bass
+            elif i < 8:
+                weight = 0.8  # Mids
             else:
-                weight = 0.4  # Presence/Highs
+                weight = 0.4  # Highs
                 
             # Add dynamic, smooth organic noise to simulate authentic multi-band movement
             fluctuation = random.uniform(-0.1, 0.1)
@@ -160,11 +176,34 @@ class SpectrumVisualizer(Widget):
             else:
                 self.bar_heights[i] = max(0, current - 1) # smooth analog decay
                 
+        # Update classic Winamp-style floating peaks
+        for i in range(self.num_bars):
+            cur = self.bar_heights[i]
+            pk = self.peak_heights[i]
+            if cur > pk:
+                self.peak_heights[i] = cur
+                self.peak_delays[i] = 4
+            else:
+                if self.peak_delays[i] > 0:
+                    self.peak_delays[i] -= 1
+                else:
+                    self.peak_heights[i] = max(0, pk - 1)
+                    
         self.refresh()
 
     def render(self) -> Text:
         max_height = 6  # 6 vertical steps for high-res spectrum mapping
         rows = []
+        
+        # Center alignment padding based on container width
+        try:
+            width = self.size.width
+        except Exception:
+            width = 34
+            
+        # Total columns string is 12 columns joined by 1 space = 23 characters
+        pad_len = max(0, (width - 23) // 2)
+        indent = " " * pad_len
         
         for h in range(max_height - 1, -1, -1):
             # Dynamic Winamp classic green-yellow-orange-red color spectrum gradient
@@ -180,13 +219,19 @@ class SpectrumVisualizer(Widget):
             row_chars = []
             for i in range(self.num_bars):
                 val = self.bar_heights[i]
+                peak = self.peak_heights[i]
+                
                 if val > h:
                     # Solid chunky block for active 8-bit LED segments
                     row_chars.append(f"[{color}]█[/]")
+                elif peak == h and peak > 0:
+                    # Floating top peak dot (Winamp style high-contrast rose pop!)
+                    row_chars.append("[#ffa8b0]▀[/]")
                 else:
-                    # Low-contrast background cell for authentic 8-bit grid display panel
-                    row_chars.append("[#231821]░[/]")
-            rows.append("".join(row_chars))
+                    # Subtle low-contrast background cell for hardware grid panel
+                    row_chars.append("[#3a2230]░[/]")
+                    
+            rows.append(indent + " ".join(row_chars))
             
         return Text.from_markup("\n".join(rows))
 
