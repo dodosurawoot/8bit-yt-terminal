@@ -83,6 +83,10 @@ class LoginScreen(Screen):
         margin: 1 0;
     }
 
+    #oauth-details-container {
+        display: none;
+    }
+
     .status-msg {
         text-align: center;
         color: #d38e91;
@@ -130,7 +134,7 @@ class LoginScreen(Screen):
                 classes="login-field"
             )
 
-            with Vertical(id="oauth-details-container", visible=False) as details:
+            with Vertical(id="oauth-details-container") as details:
                 yield Label("1. Go to the verification URL in your browser:", classes="login-desc")
                 yield Label("", id="verification-url-lbl", classes="oauth-url")
                 yield Label("2. Enter this device authorization code:", classes="login-desc")
@@ -157,15 +161,16 @@ class LoginScreen(Screen):
                 code_data = await self.ms.get_oauth_code(client_id, client_secret)
                 
                 # Show OAuth directions panel
-                self.query_one("#oauth-details-container").visible = True
+                self.query_one("#oauth-details-container").display = True
                 self.query_one("#verification-url-lbl", Label).update(code_data["verification_url"])
                 self.query_one("#user-code-lbl", Label).update(f"  {code_data['user_code']}  ")
                 self.query_one("#polling-status-lbl", Label).update("Waiting for your authorization... ⏳")
                 
                 # Hide input fields to clean up display
-                self.query_one("#client-id-input").visible = False
-                self.query_one("#client-secret-input").visible = False
-                self.query_one(".login-field-lbl").visible = False
+                self.query_one("#client-id-input").display = False
+                self.query_one("#client-secret-input").display = False
+                for lbl in self.query(".login-field-lbl"):
+                    lbl.display = False
                 
                 # Start background polling task
                 self.device_code = code_data["device_code"]
