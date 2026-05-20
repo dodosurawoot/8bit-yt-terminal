@@ -6,9 +6,11 @@ venv/
 build/
 dist/
 *.egg-info/
+resources/*
+deploy.py
 *.spec
 *.log
 yt-terminal-mpv.sock
 yt_terminal_mpv.sock
 developer-agent.md
-
+Makefile

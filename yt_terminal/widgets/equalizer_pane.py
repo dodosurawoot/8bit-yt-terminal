@@ -103,7 +103,7 @@ class SpectrumVisualizer(Widget):
         self.current_style = (self.current_style + 1) % 4
 
     def animate_spectrum(self) -> None:
-        max_height = 6
+        max_height = 12
         if not self.anim_active:
             # Graceful decay when paused
             for i in range(self.num_bars):
