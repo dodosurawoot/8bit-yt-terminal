@@ -50,6 +50,7 @@ Screen {
     padding: 1 1;
     margin: 0 1 0 0;
     layout: vertical;
+    align: center middle;
 }
 
 #right-pane {

@@ -1,6 +1,8 @@
 # Left Pane Widget: Artwork, Track Info, Progress & Controls
 
 import os
+import time
+import math
 from PIL import Image
 from textual.widget import Widget
 from textual.widgets import Label, Button
@@ -167,13 +169,43 @@ class PlayerPane(Widget):
         self.play_time_lbl.update(curr_str)
         self.rem_time_lbl.update(rem_str)
         
-        # Calculate dynamic track characters
-        total_chars = 16
+        # Calculate dynamic track characters with higher resolution (22 chars)
+        total_chars = 22
         percent = min(1.0, max(0.0, self.track_current_time / self.track_duration)) if self.track_duration > 0 else 0
         dot_pos = int(percent * (total_chars - 1))
         
-        track_str = "━" * dot_pos + "●" + "━" * (total_chars - 1 - dot_pos)
-        self.progress_track.update(track_str)
+        # Calculate dynamic glowing head color that 'breathes' based on time
+        t = time.time()
+        pulse = 0.5 + 0.5 * math.sin(t * 4.0) # Breathes 4 times a second
+        if pulse > 0.75:
+            head_color = "#ffffff" # Bright hot-spot glow
+        elif pulse > 0.35:
+            head_color = "#00f3ff" # Cyber Cyan
+        else:
+            head_color = "#0088cc" # Deep ocean pulse
+            
+        parts = []
+        for x in range(total_chars):
+            if x < dot_pos:
+                # Fading gradient track: interpolates from deep ocean blue to neon cyan trail
+                ratio = x / dot_pos if dot_pos > 0 else 0
+                if ratio < 0.25:
+                    col = "#002277" # Deep blue base
+                elif ratio < 0.5:
+                    col = "#0044bb"
+                elif ratio < 0.75:
+                    col = "#0077ff"
+                else:
+                    col = "#00d4ff" # Cyan light trail
+                parts.append(f"[{col}]━[/]")
+            elif x == dot_pos:
+                parts.append(f"[bold {head_color}]●[/]")
+            else:
+                # Unplayed section: dim translucent dark gray
+                parts.append("[#262938]━[/]")
+                
+        track_markup = "".join(parts)
+        self.progress_track.update(Text.from_markup(track_markup))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id

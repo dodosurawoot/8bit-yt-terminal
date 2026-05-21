@@ -81,10 +81,12 @@ class SpectrumVisualizer(Widget):
 
     def on_mount(self) -> None:
         self.num_bars = 24
-        self.bar_heights = [0 for _ in range(self.num_bars)]
-        self.peak_heights = [0 for _ in range(self.num_bars)]
+        self.bar_heights = [0.0 for _ in range(self.num_bars)]
+        self.bar_velocities = [0.0 for _ in range(self.num_bars)]
+        self.peak_heights = [0.0 for _ in range(self.num_bars)]
         self.peak_delays = [0 for _ in range(self.num_bars)]
-        self.set_interval(0.08, self.animate_spectrum)
+        # Boost frame rate to 25 FPS (0.04s interval) for liquid-smooth physics-based animation
+        self.set_interval(0.04, self.animate_spectrum)
         self.update_border_title()
 
     def watch_current_style(self, new_style: int) -> None:
@@ -105,12 +107,13 @@ class SpectrumVisualizer(Widget):
         self.current_style = (self.current_style + 1) % 4
 
     def animate_spectrum(self) -> None:
-        max_height = 12
+        max_height = 6.0
+        
+        # Graceful decay when paused or inactive
         if not self.anim_active:
-            # Graceful decay when paused
             for i in range(self.num_bars):
-                self.bar_heights[i] = max(0, self.bar_heights[i] - 1)
-                self.peak_heights[i] = max(0, self.peak_heights[i] - 1)
+                self.bar_heights[i] = max(0.0, self.bar_heights[i] - 0.15)
+                self.peak_heights[i] = max(0.0, self.peak_heights[i] - 0.1)
             self.refresh()
             return
             
@@ -128,54 +131,56 @@ class SpectrumVisualizer(Widget):
 
         if amp <= 0.0:
             if is_playing:
-                # Organic multi-band procedural simulation fallback!
+                # Procedural synthwave organic wave simulation with physics!
                 t = time.time()
                 for i in range(self.num_bars):
-                    # Rolling wave combined with high-frequency noise
-                    val = 2.0 + 1.5 * math.sin(t * 3.5 + i * 0.9)
-                    val += 1.0 * math.sin(t * 9.0 - i * 1.4)
+                    # Combine multiple harmonic waves for dynamic flowing movement
+                    val = 2.5 + 2.0 * math.sin(t * 2.5 + i * 0.4)
+                    val += 1.0 * math.sin(t * 5.0 - i * 0.8)
                     
-                    # Bass emphasis on left 3 columns
-                    if i < 3:
-                        val += 1.2 * (1.0 + math.sin(t * 6.5))
-                    # Midrange emphasis on center 6 columns
-                    elif i < 9:
-                        val += 0.8 * (1.0 + math.cos(t * 5.0))
-                    # Treble hiss on right 3 columns
-                    else:
-                        val += 0.8 * random.random()
+                    # Section-specific frequency accentuations
+                    if i < 4:
+                        val += 1.0 * (1.0 + math.sin(t * 4.0)) # Bass roll
+                    elif i > self.num_bars - 4:
+                        val += 0.5 * random.random() # Treble shimmer
                         
-                    target = int(max(0, min(max_height, val)))
-                    current = self.bar_heights[i]
-                    if current < target:
-                        self.bar_heights[i] = min(max_height, current + 2)
-                    else:
-                        self.bar_heights[i] = max(0, current - 1)
+                    target = max(0.0, min(max_height, val))
+                    
+                    y = self.bar_heights[i]
+                    v = self.bar_velocities[i]
+                    # Springy rise, slower drag decay
+                    accel = (target - y) * 0.4 if target > y else (target - y) * 0.18 - 0.03
+                    v = v * 0.72 + accel
+                    y = max(0.0, min(max_height, y + v))
+                    if y <= 0.0:
+                        v = 0.0
+                    self.bar_heights[i] = y
+                    self.bar_velocities[i] = v
                 
-                # Update floating peaks
+                # Update visualizer peak heights
                 for i in range(self.num_bars):
                     cur = self.bar_heights[i]
                     pk = self.peak_heights[i]
                     if cur > pk:
                         self.peak_heights[i] = cur
-                        self.peak_delays[i] = 4
+                        self.peak_delays[i] = 5
                     else:
                         if self.peak_delays[i] > 0:
                             self.peak_delays[i] -= 1
                         else:
-                            self.peak_heights[i] = max(0, pk - 1)
+                            self.peak_heights[i] = max(0.0, pk - 0.15)
                             
                 self.refresh()
                 return
             else:
-                # Silent parts decay columns gracefully
+                # Decays slowly on stop
                 for i in range(self.num_bars):
-                    self.bar_heights[i] = max(0, self.bar_heights[i] - 1)
-                    self.peak_heights[i] = max(0, self.peak_heights[i] - 1)
+                    self.bar_heights[i] = max(0.0, self.bar_heights[i] - 0.2)
+                    self.peak_heights[i] = max(0.0, self.peak_heights[i] - 0.1)
                 self.refresh()
                 return
 
-        # Distribute RMS power across 12 bands with dynamic peak weighting
+        # Real audio stream dynamic analysis: apply organic fluid physics
         for i in range(self.num_bars):
             if i < 3:
                 weight = 1.3  # Bass
@@ -184,29 +189,39 @@ class SpectrumVisualizer(Widget):
             else:
                 weight = 0.4  # Highs
                 
-            # Add dynamic, smooth organic noise to simulate authentic multi-band movement
-            fluctuation = random.uniform(-0.1, 0.1)
-            target = int((amp * weight + fluctuation) * 10)
-            target = max(0, min(max_height, target))
+            fluctuation = random.uniform(-0.15, 0.15)
+            target = (amp * weight + fluctuation) * 6.0
+            target = max(0.0, min(max_height, target))
             
-            current = self.bar_heights[i]
-            if current < target:
-                self.bar_heights[i] = min(max_height, current + 2) # fast rise
+            y = self.bar_heights[i]
+            v = self.bar_velocities[i]
+            
+            # Spring-mass physics calculation for liquid organic bounce
+            if target > y:
+                accel = (target - y) * 0.48 # Fast snappy upward acceleration
             else:
-                self.bar_heights[i] = max(0, current - 1) # smooth analog decay
+                accel = (target - y) * 0.22 - 0.05 # Organic gravity fall with speed decay
                 
-        # Update classic Winamp-style floating peaks
+            v = v * 0.7 + accel
+            y = max(0.0, min(max_height, y + v))
+            if y <= 0.0:
+                v = 0.0
+                
+            self.bar_heights[i] = y
+            self.bar_velocities[i] = v
+                
+        # Classic floating peak decays
         for i in range(self.num_bars):
             cur = self.bar_heights[i]
             pk = self.peak_heights[i]
             if cur > pk:
                 self.peak_heights[i] = cur
-                self.peak_delays[i] = 4
+                self.peak_delays[i] = 5
             else:
                 if self.peak_delays[i] > 0:
                     self.peak_delays[i] -= 1
                 else:
-                    self.peak_heights[i] = max(0, pk - 1)
+                    self.peak_heights[i] = max(0.0, pk - 0.12)
                     
         self.refresh()
 
@@ -214,39 +229,56 @@ class SpectrumVisualizer(Widget):
         max_height = 6
         rows = []
         
-        # Style 0: Chunky Synthwave-style LED grid (Cyan to Pink Gradient)
+        # Gradient colors from deep blue at the bottom to vibrant cyber cyan at the top
+        colors = ["#0033aa", "#0055dd", "#0077ff", "#00aaff", "#00d4ff", "#00f3ff"]
+        
+        # Style 0: Chunky LED Grid with smooth deep blue to cyan gradient and sub-cell precision
         if self.current_style == 0:
             for h in range(max_height - 1, -1, -1):
-                if h >= 4:
-                    color = "#ff2a7a"  # Peak Hot Pink
-                elif h >= 3:
-                    color = "#be44ff"  # Transition Magenta/Violet
-                elif h >= 1:
-                    color = "#00d4ff"  # Cyber Cyan Transition
-                else:
-                    color = "#00f3ff"  # Base Electric Cyan
-                    
+                color = colors[h]
                 row_chars = []
                 for i in range(self.num_bars):
                     val = self.bar_heights[i]
                     peak = self.peak_heights[i]
                     
-                    if val > h:
+                    if val >= h + 1:
+                        # Fully active block
                         row_chars.append(f"[{color}]█[/]")
-                    elif peak == h and peak > 0:
-                        row_chars.append("[#ffaec9]▀[/]")
+                    elif val <= h:
+                        # Inactive cell: check if peak sits exactly here
+                        if int(peak) == h and peak > 0:
+                            row_chars.append("[#ffaec9]▀[/]") # Soft glowing pink peak
+                        else:
+                            row_chars.append("[#262938]░[/]") # Obsidian translucent background cell
                     else:
-                        row_chars.append("[#262938]░[/]")
-                        
+                        # Partially active cell (fractional height sub-block rendering)
+                        fraction = val - h
+                        if fraction < 0.125:
+                            row_chars.append("[#262938]░[/]")
+                        elif fraction < 0.25:
+                            row_chars.append(f"[{color}] [/]")
+                        elif fraction < 0.375:
+                            row_chars.append(f"[{color}]▂[/]")
+                        elif fraction < 0.5:
+                            row_chars.append(f"[{color}]▃[/]")
+                        elif fraction < 0.625:
+                            row_chars.append(f"[{color}]▄[/]")
+                        elif fraction < 0.75:
+                            row_chars.append(f"[{color}]▅[/]")
+                        elif fraction < 0.875:
+                            row_chars.append(f"[{color}]▆[/]")
+                        else:
+                            row_chars.append(f"[{color}]▇[/]")
+                            
                 rows.append(" ".join(row_chars))
                 
-        # Style 1: HUD Mirrored (Symmetric up & down from center baseline)
+        # Style 1: HUD Mirrored (Symmetric up & down from center baseline with sub-block resolution)
         elif self.current_style == 1:
             for h in range(max_height - 1, -1, -1):
                 row_chars = []
                 for i in range(self.num_bars):
                     v = self.bar_heights[i]
-                    active_height = int(v / 2) # Maps 0..6 to 0..3 active blocks
+                    active_height = v / 2.0 # Maps 0..6 to 0..3 active blocks float
                     
                     # Colors for high-tech HUD mirrored styling
                     if h == 5 or h == 0:
@@ -258,20 +290,25 @@ class SpectrumVisualizer(Widget):
                         
                     if h >= 3:
                         idx = h - 3
-                        if active_height > idx:
+                        if active_height >= idx + 1:
                             row_chars.append(f"[{color}]█[/]")
-                        elif h == 3:
-                            row_chars.append(f"[{color}]▄[/]")
-                        else:
+                        elif active_height <= idx:
                             row_chars.append("[#15223c]·[/]")
+                        else:
+                            # Sub-block precision upwards
+                            fraction = active_height - idx
+                            sub_chars = [" ", "▂", "▃", "▄", "▅", "▆", "▇"]
+                            char_idx = min(6, int(fraction * 8))
+                            row_chars.append(f"[{color}]{sub_chars[char_idx]}[/]")
                     else:
                         idx = 2 - h
-                        if active_height > idx:
+                        if active_height >= idx + 1:
                             row_chars.append(f"[{color}]█[/]")
-                        elif h == 2:
-                            row_chars.append(f"[{color}]▀[/]")
-                        else:
+                        elif active_height <= idx:
                             row_chars.append("[#15223c]·[/]")
+                        else:
+                            # Downward fraction rendering representation
+                            row_chars.append(f"[{color}]▀[/]")
                             
                 rows.append(" ".join(row_chars))
 
