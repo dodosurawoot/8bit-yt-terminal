@@ -18,18 +18,12 @@ class SearchOverlay(Screen):
 
     #search-box {
         width: 80;
-        height: 30;
+        height: 28;
         border: round #7a5260;
         background: #1c1216;
-        padding: 1 2;
+        padding: 2 4;
         border-title-color: #d38e91;
-    }
-
-    .search-title {
-        text-align: center;
-        color: #d38e91;
-        text-style: bold;
-        margin-bottom: 1;
+        overflow: hidden;
     }
 
     #search-input {
@@ -45,24 +39,46 @@ class SearchOverlay(Screen):
         width: 100%;
         height: 3;
         margin-bottom: 1;
+        background: #22151b;
+        border-radius: 1;
     }
 
     .filter-btn {
-        min-width: 14;
-        margin: 0 1;
-        background: #2a1a22;
-        border: round #7a5260;
-        color: #a68894;
+        min-width: 16;
         height: 3;
+        background: transparent;
+        border: none;
+        color: #a68894;
         content-align: center middle;
+        text-style: bold;
+    }
+
+    .filter-btn:hover {
+        background: #2d1c25;
+        color: #fbe5e6;
+        border: none;
+    }
+
+    .filter-btn:focus {
+        border: none;
     }
 
     .filter-btn.active {
-        background: #3d232d;
-        color: #fbe5e6;
-        border: round #d38e91;
+        background: #d38e91;
+        color: #1c1216;
         text-style: bold;
-        height: 3;
+        border: none;
+    }
+
+    .filter-btn.active:hover {
+        background: #d38e91;
+        color: #1c1216;
+    }
+
+    .filter-btn.active:focus {
+        background: #d38e91;
+        color: #1c1216;
+        border: none;
     }
 
     #search-results-list {
@@ -70,6 +86,7 @@ class SearchOverlay(Screen):
         background: #150d10;
         border: solid #7a5260;
         scrollbar-size: 1 1;
+        overflow-x: hidden;
     }
 
     .search-item-row {
@@ -78,23 +95,27 @@ class SearchOverlay(Screen):
         height: 1;
     }
 
+    .search-item-icon {
+        width: 3;
+        color: #d38e91;
+    }
+
     .search-item-title {
-        width: 45%;
+        width: 50%;
         color: #fbe5e6;
         text-overflow: ellipsis;
     }
 
-    .search-item-artist {
-        width: 30%;
+    .search-item-separator {
+        width: 3;
         color: #a68894;
-        text-overflow: ellipsis;
+        text-align: center;
     }
 
-    .search-item-album {
-        width: 25%;
+    .search-item-artist {
+        width: 40%;
         color: #a68894;
         text-overflow: ellipsis;
-        text-align: right;
     }
     """
 
@@ -126,10 +147,9 @@ class SearchOverlay(Screen):
 
         with Vertical(id="search-box") as v:
             v.border_title = " SEARCH YT-TERMINAL "
-            yield Label("🔍  Find Songs, Albums & Playlists", classes="search-title")
             
             yield Input(
-                placeholder="Type song name or keywords...",
+                placeholder="Find Songs, Albums & Playlists...",
                 id="search-input"
             )
 
@@ -252,34 +272,27 @@ class SearchOverlay(Screen):
                 lv.append(ListItem(Label("❌ No results found. Try a different category or search term!")))
             else:
                 for i, track in enumerate(tracks):
-                    if self.current_filter == "songs":
-                        row = Horizontal(
-                            Label(track.title, classes="search-item-title"),
-                            Label(f" - {track.artist}", classes="search-item-artist"),
-                            Label(track.album, classes="search-item-album"),
-                            classes="search-item-row"
-                        )
-                    elif self.current_filter == "albums":
-                        row = Horizontal(
-                            Label(f"💿 {track.title}", classes="search-item-title"),
-                            Label(f" - {track.artist}", classes="search-item-artist"),
-                            Label("Album", classes="search-item-album"),
-                            classes="search-item-row"
-                        )
+                    icon_char = "♪"
+                    if self.current_filter == "albums":
+                        icon_char = "💿"
                     elif self.current_filter == "playlists":
-                        row = Horizontal(
-                            Label(f"🎶 {track.title}", classes="search-item-title"),
-                            Label(f" - {track.artist}", classes="search-item-artist"),
-                            Label("Playlist", classes="search-item-album"),
-                            classes="search-item-row"
-                        )
-                    else:  # artists
-                        row = Horizontal(
-                            Label(f"👤 {track.title}", classes="search-item-title"),
-                            Label("Artist page", classes="search-item-artist"),
-                            Label("", classes="search-item-album"),
-                            classes="search-item-row"
-                        )
+                        icon_char = "🎶"
+                    elif self.current_filter == "artists":
+                        icon_char = "👤"
+
+                    artist_name = track.artist if track.artist else "Unknown Artist"
+                    if self.current_filter == "playlists" and not track.artist:
+                        artist_name = "Playlist"
+                    elif self.current_filter == "artists":
+                        artist_name = "Artist"
+
+                    row = Horizontal(
+                        Label(icon_char, classes="search-item-icon"),
+                        Label(track.title, classes="search-item-title"),
+                        Label(" - ", classes="search-item-separator"),
+                        Label(artist_name, classes="search-item-artist"),
+                        classes="search-item-row"
+                    )
                     
                     item = ListItem(row)
                     item.track_index = i
