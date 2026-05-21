@@ -85,7 +85,12 @@ class MusicService:
                     log.warning(f"Failed to normalize OAuth file: {e}")
 
             try:
-                self.yt = YTMusic(str(ConfigManager.OAUTH_FILE))
+                client_id, client_secret = ConfigManager.get_credentials()
+                if client_id and client_secret:
+                    creds = OAuthCredentials(client_id, client_secret)
+                    self.yt = YTMusic(str(ConfigManager.OAUTH_FILE), oauth_credentials=creds)
+                else:
+                    self.yt = YTMusic(str(ConfigManager.OAUTH_FILE))
             except Exception as e:
                 log.error(f"Failed to initialize authenticated YTMusic: {e}")
                 self.yt = None
