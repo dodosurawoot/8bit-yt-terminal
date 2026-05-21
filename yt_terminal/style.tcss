@@ -136,6 +136,13 @@ AlbumArt {
     background: #ff2a7a 20%;
 }
 
+#volume-lbl {
+    color: $accent;
+    text-style: bold;
+    width: 1fr;
+    text-align: center;
+}
+
 #menu-btn {
     color: $text-muted;
     width: 4;
@@ -214,6 +221,24 @@ AlbumArt {
     background: #25283b;
     color: $accent;
     border: tall $accent;
+}
+
+#media-controls Button#shuffle-btn.active {
+    background: #00f3ff 20%;
+    color: #00f3ff;
+    border: tall #00f3ff;
+}
+
+#media-controls Button#repeat-btn.active-all {
+    background: #ff2a7a 20%;
+    color: #ff2a7a;
+    border: tall #ff2a7a;
+}
+
+#media-controls Button#repeat-btn.active-one {
+    background: #ffea00 20%;
+    color: #ffea00;
+    border: tall #ffea00;
 }
 
 /* EQ & Visualizer Styling */

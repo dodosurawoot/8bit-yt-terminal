@@ -1,9 +1,12 @@
-# ColorThief dynamic palette extractor and TCSS variable generator
-
 import os
+import hashlib
+import requests
 import logging
 from PIL import Image
 from colorthief import ColorThief
+from yt_terminal.config_manager import ConfigManager
+
+log = logging.getLogger("yt-terminal")
 
 # Fallback premium dark theme palette
 DEFAULT_THEME = {
@@ -41,8 +44,8 @@ def extract_palette(image_path=None):
     
     try:
         color_thief = ColorThief(image_path)
-        dominant = color_thief.get_color(quality=1)
-        palette = color_thief.get_palette(color_count=5, quality=1)
+        dominant = color_thief.get_color(quality=5)
+        palette = color_thief.get_palette(color_count=5, quality=5)
         
         # Ensure we have at least 3 distinct dominant colors from palette
         c1 = palette[0] if len(palette) > 0 else dominant
@@ -89,45 +92,57 @@ def extract_palette(image_path=None):
             "border": rgb_to_hex(border_rgb)
         }
     except Exception as e:
-        logging.error(f"Failed to extract palette from image: {e}")
+        log.error(f"Failed to extract palette from image: {e}")
         return DEFAULT_THEME.copy()
 
 def download_and_extract(thumbnail_url: str) -> dict:
     """
     Downloads a thumbnail image, caches it, and extracts the theme palette.
     Falls back to the default theme on any network or filesystem failures.
+    Returns theme dictionary with an 'artwork_path' entry pointing to the cached file.
     """
     if not thumbnail_url:
-        return DEFAULT_THEME.copy()
+        theme = DEFAULT_THEME.copy()
+        theme["artwork_path"] = ""
+        return theme
         
-    import hashlib
-    import requests
-    from yt_terminal.config_manager import ConfigManager
-    
     ConfigManager.ensure_dirs()
     url_hash = hashlib.md5(thumbnail_url.encode("utf-8")).hexdigest()
     cache_path = ConfigManager.CACHE_DIR / f"{url_hash}.jpg"
+    thumb_path = ConfigManager.CACHE_DIR / f"{url_hash}_thumb.jpg"
     
+    # Download original thumbnail if missing
     if not cache_path.exists():
         try:
             r = requests.get(thumbnail_url, timeout=5)
             if r.status_code == 200:
                 with open(cache_path, "wb") as f:
                     f.write(r.content)
-                # Optimize image size for ColorThief palette extraction
-                try:
-                    with Image.open(cache_path) as img:
-                        img.thumbnail((64, 64))
-                        img.save(cache_path, "JPEG")
-                except Exception as e:
-                    logging.warning(f"Failed to downscale cached thumbnail: {e}")
             else:
-                return DEFAULT_THEME.copy()
+                theme = DEFAULT_THEME.copy()
+                theme["artwork_path"] = ""
+                return theme
         except Exception as e:
-            logging.error(f"Failed to download thumbnail: {e}")
-            return DEFAULT_THEME.copy()
-            
-    return extract_palette(str(cache_path))
+            log.error(f"Failed to download thumbnail: {e}")
+            theme = DEFAULT_THEME.copy()
+            theme["artwork_path"] = ""
+            return theme
+
+    # Generate downscaled thumb version for fast color extraction if missing
+    if not thumb_path.exists():
+        try:
+            with Image.open(cache_path) as img:
+                img.thumbnail((64, 64))
+                img.save(thumb_path, "JPEG")
+        except Exception as e:
+            log.warning(f"Failed to downscale cached thumbnail: {e}")
+            # Fallback to original path if downscale fails
+            thumb_path = cache_path
+
+    # Extract dominant color scheme using 64x64 thumbnail
+    theme = extract_palette(str(thumb_path))
+    theme["artwork_path"] = str(cache_path)
+    return theme
 
 def generate_tcss(theme_dict):
     """
@@ -136,13 +151,14 @@ def generate_tcss(theme_dict):
     return f"""
 /* Generated TUI Theme Stylesheet */
 $primary-bg: {theme_dict.get('primary_bg', '#0a0b10')};
+$panel-bg: {theme_dict.get('panel_bg', '#131520')};
 $player-bg: {theme_dict.get('player_bg', '#121422')};
 $eq-bg: {theme_dict.get('eq_bg', '#151320')};
 $right-bg: {theme_dict.get('right_bg', '#161622')};
-$accent: {theme_dict['accent']};
-$text-primary: {theme_dict['text_primary']};
-$text-muted: {theme_dict['text_muted']};
-$border: {theme_dict['border']};
+$accent: {theme_dict.get('accent', '#00f3ff')};
+$text-primary: {theme_dict.get('text_primary', '#f5f6fa')};
+$text-muted: {theme_dict.get('text_muted', '#686d80')};
+$border: {theme_dict.get('border', '#262938')};
 
 Screen {{
     background: $primary-bg;

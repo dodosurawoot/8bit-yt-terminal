@@ -18,7 +18,8 @@ classifiers = [
     "Environment :: Console",
 ]
 dependencies = [
-    "textual>=0.50.0",
+    "textual>=0.87.0",
+    "rich>=13.9.0",
     "colorthief>=0.2.1",
     "pillow>=10.0.0",
     "ytmusicapi>=1.12.0",

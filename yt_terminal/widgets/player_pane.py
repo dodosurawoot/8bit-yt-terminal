@@ -12,6 +12,10 @@ from textual.message import Message
 
 from rich.text import Text
 
+def _format_time(seconds: float) -> str:
+    m, s = divmod(int(seconds), 60)
+    return f"{m}:{s:02d}"
+
 class AlbumArt(Widget):
     """Renders the album art image as retro 8-bit colored pixel art."""
     image_path = reactive(None)
@@ -70,11 +74,12 @@ class AlbumArt(Widget):
             img = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16).convert("RGB")
             
             lines = []
+            pixels = img.load()
             for y in range(side // 2):
                 line_markup = []
                 for x in range(side):
-                    top_rgb = img.getpixel((x, 2 * y))
-                    bottom_rgb = img.getpixel((x, 2 * y + 1))
+                    top_rgb = pixels[x, 2 * y]
+                    bottom_rgb = pixels[x, 2 * y + 1]
                     line_markup.append(
                         f"[rgb({top_rgb[0]},{top_rgb[1]},{top_rgb[2]}) on rgb({bottom_rgb[0]},{bottom_rgb[1]},{bottom_rgb[2]})]▀[/]"
                     )
@@ -95,15 +100,34 @@ class PlayerPane(Widget):
         pass
     class PrevTrack(Message):
         pass
+    class ShuffleToggle(Message):
+        pass
+    class RepeatToggle(Message):
+        pass
 
     track_title = reactive("No Track")
     track_artist = reactive("—")
     track_album = reactive("—")
-    track_duration = reactive(201)
-    track_current_time = reactive(152)
+    track_duration = reactive(0)
+    track_current_time = reactive(0)
     bitrate = reactive("Hi-Res Lossless")
     artwork_path = reactive("")
     is_playing = reactive(True)
+    shuffle_mode = reactive(False)
+    repeat_mode = reactive("off")  # "off", "one", "all"
+    volume_level = reactive(80)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.album_art = None
+        self.title_lbl = None
+        self.artist_lbl = None
+        self.volume_lbl = None
+        self.play_time_lbl = None
+        self.progress_track = None
+        self.rem_time_lbl = None
+        self.bitrate_lbl = None
+        self.play_btn = None
 
     def compose(self):
         self.border_title = "Now Playing"
@@ -118,9 +142,11 @@ class PlayerPane(Widget):
         yield self.title_lbl
         yield self.artist_lbl
         
-        # Favorite button & Options menu row
+        # Favorite button, Volume indicator & Options menu row
         with Horizontal(id="favorite-and-menu"):
             yield Label("★", id="favorite-btn")
+            self.volume_lbl = Label("🔊 80%", id="volume-lbl")
+            yield self.volume_lbl
             yield Label("•••", id="menu-btn")
             
         # Progress Bar / Time Indicators
@@ -147,28 +173,64 @@ class PlayerPane(Widget):
             yield Button("RPT", id="repeat-btn")
 
     def watch_track_title(self, new_val):
-        if hasattr(self, "title_lbl"):
+        if self.title_lbl is not None:
             self.title_lbl.update(new_val)
 
     def watch_track_artist(self, new_val):
-        if hasattr(self, "artist_lbl"):
+        if self.artist_lbl is not None:
             self.artist_lbl.update(f"{new_val} — {self.track_album}")
 
     def watch_track_album(self, new_val):
-        if hasattr(self, "artist_lbl"):
+        if self.artist_lbl is not None:
             self.artist_lbl.update(f"{self.track_artist} — {new_val}")
 
     def watch_bitrate(self, new_val):
-        if hasattr(self, "bitrate_lbl"):
+        if self.bitrate_lbl is not None:
             self.bitrate_lbl.update(new_val)
 
     def watch_artwork_path(self, new_val):
-        if hasattr(self, "album_art"):
+        if self.album_art is not None:
             self.album_art.image_path = new_val
 
     def watch_is_playing(self, new_val):
-        if hasattr(self, "play_btn"):
+        if self.play_btn is not None:
             self.play_btn.label = "⏸" if new_val else "▶"
+
+    def watch_shuffle_mode(self, new_val: bool):
+        try:
+            btn = self.query_one("#shuffle-btn", Button)
+            if new_val:
+                btn.add_class("active")
+            else:
+                btn.remove_class("active")
+        except Exception as e:
+            log.debug(f"Failed to update shuffle button styles: {e}")
+
+    def watch_repeat_mode(self, new_val: str):
+        try:
+            btn = self.query_one("#repeat-btn", Button)
+            btn.remove_class("active-all", "active-one")
+            if new_val == "all":
+                btn.add_class("active-all")
+                btn.label = "RPT"
+            elif new_val == "one":
+                btn.add_class("active-one")
+                btn.label = "RP1"
+            else:
+                btn.label = "RPT"
+        except Exception as e:
+            log.debug(f"Failed to update repeat button styles: {e}")
+
+    def watch_volume_level(self, new_val: int):
+        if self.volume_lbl is not None:
+            icon = "🔊"
+            if new_val == 0:
+                icon = "🔇"
+            elif new_val < 30:
+                icon = "🔈"
+            elif new_val < 70:
+                icon = "🔉"
+            self.volume_lbl.update(f"{icon} {new_val}%")
 
     def watch_track_current_time(self, new_val):
         self.update_progress_ui()
@@ -177,17 +239,11 @@ class PlayerPane(Widget):
         self.update_progress_ui()
 
     def update_progress_ui(self):
-        if not hasattr(self, "play_time_lbl"):
+        if self.play_time_lbl is None:
             return
-            
-        # Convert seconds to M:SS
-        def format_time(seconds):
-            m, s = divmod(int(seconds), 60)
-            return f"{m}:{s:02d}"
-            
-        curr_str = format_time(self.track_current_time)
+        curr_str = _format_time(self.track_current_time)
         rem_seconds = max(0, self.track_duration - self.track_current_time)
-        rem_str = f"-{format_time(rem_seconds)}"
+        rem_str = f"-{_format_time(rem_seconds)}"
         
         self.play_time_lbl.update(curr_str)
         self.rem_time_lbl.update(rem_str)
@@ -238,3 +294,7 @@ class PlayerPane(Widget):
             self.post_message(self.NextTrack())
         elif button_id == "prev-btn":
             self.post_message(self.PrevTrack())
+        elif button_id == "shuffle-btn":
+            self.post_message(self.ShuffleToggle())
+        elif button_id == "repeat-btn":
+            self.post_message(self.RepeatToggle())

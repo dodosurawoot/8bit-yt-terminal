@@ -4,15 +4,20 @@ from textual.containers import Center
 import random
 import time
 import math
+from rich.text import Text
 from textual.widget import Widget
 from textual.widgets import Label, Select
 from textual.containers import Vertical, Horizontal
 from textual.reactive import reactive
-from yt_terminal.mock_data import EQ_PRESETS
+from yt_terminal.presets import EQ_PRESETS
 
 class EqualizerWidget(Widget):
     """Renders the 8-band Equalizer visualizer with dB vertical bars."""
     preset_name = reactive("YT-DeepRose")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sliders = []
 
     def compose(self):
         yield Label("Equalizer", classes="eq-title")
@@ -46,7 +51,7 @@ class EqualizerWidget(Widget):
         self.update_sliders()
 
     def update_sliders(self):
-        if not hasattr(self, "sliders") or not self.sliders:
+        if not self.sliders:
             return
             
         levels = EQ_PRESETS.get(self.preset_name, [5] * 8)
@@ -70,7 +75,18 @@ class EqualizerWidget(Widget):
         if event.select == self.select_preset:
             self.preset_name = str(event.value)
 
-from rich.text import Text
+
+
+# Spectrum Visualizer physics and animation constants
+SPRING_RISE_PROCEDURAL = 0.4
+SPRING_FALL_PROCEDURAL = 0.18
+GRAVITY_PROCEDURAL = 0.03
+DAMPING_PROCEDURAL = 0.72
+
+SPRING_RISE_AUDIO = 0.48
+SPRING_FALL_AUDIO = 0.22
+GRAVITY_AUDIO = 0.05
+DAMPING_AUDIO = 0.7
 
 class SpectrumVisualizer(Widget):
     """An active dynamic spectrum visualizer displaying animated block columns synced to mpv audio."""
@@ -78,6 +94,8 @@ class SpectrumVisualizer(Widget):
     # Visualizer state
     anim_active = reactive(True)
     current_style = reactive(0) # 0: Chunky LED Grid, 1: HUD Mirrored, 2: Analog Wave, 3: Digital Solid
+    audio_level = reactive(0.0)
+    is_playing = reactive(False)
 
     def on_mount(self) -> None:
         self.num_bars = 24
@@ -85,6 +103,9 @@ class SpectrumVisualizer(Widget):
         self.bar_velocities = [0.0 for _ in range(self.num_bars)]
         self.peak_heights = [0.0 for _ in range(self.num_bars)]
         self.peak_delays = [0 for _ in range(self.num_bars)]
+        self._frame_counter = 0
+        self._cached_render_state = None
+        self._cached_render_text = None
         # Boost frame rate to 25 FPS (0.04s interval) for liquid-smooth physics-based animation
         self.set_interval(0.04, self.animate_spectrum)
         self.update_border_title()
@@ -106,8 +127,40 @@ class SpectrumVisualizer(Widget):
         """Cycle visualizer style on mouse click."""
         self.current_style = (self.current_style + 1) % 4
 
+    def _apply_spring_physics(self, index: int, target: float, max_height: float, rise_k: float, fall_k: float, gravity: float, damping: float):
+        y = self.bar_heights[index]
+        v = self.bar_velocities[index]
+        if target > y:
+            accel = (target - y) * rise_k
+        else:
+            accel = (target - y) * fall_k - gravity
+        v = v * damping + accel
+        y = max(0.0, min(max_height, y + v))
+        if y <= 0.0:
+            v = 0.0
+        self.bar_heights[index] = y
+        self.bar_velocities[index] = v
+
+    def _update_peaks(self, decay_rate: float, delay_frames: int):
+        for i in range(self.num_bars):
+            cur = self.bar_heights[i]
+            pk = self.peak_heights[i]
+            if cur > pk:
+                self.peak_heights[i] = cur
+                self.peak_delays[i] = delay_frames
+            else:
+                if self.peak_delays[i] > 0:
+                    self.peak_delays[i] -= 1
+                else:
+                    self.peak_heights[i] = max(0.0, pk - decay_rate)
+
     def animate_spectrum(self) -> None:
+        # Performance & visibility gating: skip updating if hidden or not mounted
+        if not self.display or not self.is_mounted or (self.parent and not self.parent.display):
+            return
+
         max_height = 6.0
+        self._frame_counter += 1
         
         # Graceful decay when paused or inactive
         if not self.anim_active:
@@ -117,22 +170,14 @@ class SpectrumVisualizer(Widget):
             self.refresh()
             return
             
-        # Extract dynamic RMS amplitude level from the active mpv player
-        amp = 0.0
-        if hasattr(self, "app") and self.app and hasattr(self.app, "player") and self.app.player:
-            try:
-                amp = self.app.player.get_audio_level()
-            except Exception:
-                pass
-
-        is_playing = False
-        if hasattr(self, "app") and self.app and hasattr(self.app, "is_playing"):
-            is_playing = self.app.is_playing
+        # Extract dynamic RMS amplitude level and playback status from reactive properties
+        amp = self.audio_level
+        is_playing = self.is_playing
 
         if amp <= 0.0:
             if is_playing:
                 # Procedural synthwave organic wave simulation with physics!
-                t = time.time()
+                t = self._frame_counter * 0.04
                 for i in range(self.num_bars):
                     # Combine multiple harmonic waves for dynamic flowing movement
                     val = 2.5 + 2.0 * math.sin(t * 2.5 + i * 0.4)
@@ -145,31 +190,14 @@ class SpectrumVisualizer(Widget):
                         val += 0.5 * random.random() # Treble shimmer
                         
                     target = max(0.0, min(max_height, val))
-                    
-                    y = self.bar_heights[i]
-                    v = self.bar_velocities[i]
-                    # Springy rise, slower drag decay
-                    accel = (target - y) * 0.4 if target > y else (target - y) * 0.18 - 0.03
-                    v = v * 0.72 + accel
-                    y = max(0.0, min(max_height, y + v))
-                    if y <= 0.0:
-                        v = 0.0
-                    self.bar_heights[i] = y
-                    self.bar_velocities[i] = v
+                    self._apply_spring_physics(
+                        i, target, max_height, 
+                        SPRING_RISE_PROCEDURAL, SPRING_FALL_PROCEDURAL, 
+                        GRAVITY_PROCEDURAL, DAMPING_PROCEDURAL
+                    )
                 
                 # Update visualizer peak heights
-                for i in range(self.num_bars):
-                    cur = self.bar_heights[i]
-                    pk = self.peak_heights[i]
-                    if cur > pk:
-                        self.peak_heights[i] = cur
-                        self.peak_delays[i] = 5
-                    else:
-                        if self.peak_delays[i] > 0:
-                            self.peak_delays[i] -= 1
-                        else:
-                            self.peak_heights[i] = max(0.0, pk - 0.15)
-                            
+                self._update_peaks(0.15, 5)
                 self.refresh()
                 return
             else:
@@ -193,39 +221,21 @@ class SpectrumVisualizer(Widget):
             target = (amp * weight + fluctuation) * 6.0
             target = max(0.0, min(max_height, target))
             
-            y = self.bar_heights[i]
-            v = self.bar_velocities[i]
-            
-            # Spring-mass physics calculation for liquid organic bounce
-            if target > y:
-                accel = (target - y) * 0.48 # Fast snappy upward acceleration
-            else:
-                accel = (target - y) * 0.22 - 0.05 # Organic gravity fall with speed decay
-                
-            v = v * 0.7 + accel
-            y = max(0.0, min(max_height, y + v))
-            if y <= 0.0:
-                v = 0.0
-                
-            self.bar_heights[i] = y
-            self.bar_velocities[i] = v
+            self._apply_spring_physics(
+                i, target, max_height, 
+                SPRING_RISE_AUDIO, SPRING_FALL_AUDIO, 
+                GRAVITY_AUDIO, DAMPING_AUDIO
+            )
                 
         # Classic floating peak decays
-        for i in range(self.num_bars):
-            cur = self.bar_heights[i]
-            pk = self.peak_heights[i]
-            if cur > pk:
-                self.peak_heights[i] = cur
-                self.peak_delays[i] = 5
-            else:
-                if self.peak_delays[i] > 0:
-                    self.peak_delays[i] -= 1
-                else:
-                    self.peak_heights[i] = max(0.0, pk - 0.12)
-                    
+        self._update_peaks(0.12, 5)
         self.refresh()
 
     def render(self) -> Text:
+        current_state = (tuple(self.bar_heights), tuple(self.peak_heights), self.current_style)
+        if self._cached_render_state == current_state and self._cached_render_text is not None:
+            return self._cached_render_text
+
         max_height = 6
         rows = []
         
@@ -354,7 +364,10 @@ class SpectrumVisualizer(Widget):
                         
                 rows.append(" ".join(row_chars))
                 
-        return Text.from_markup("\n".join(rows))
+        rendered = Text.from_markup("\n".join(rows))
+        self._cached_render_state = current_state
+        self._cached_render_text = rendered
+        return rendered
 
 class EqualizerPane(Widget):
     """The complete Center Pane wrapping EQ sliders, spectrum, and tabs."""

@@ -171,7 +171,7 @@ class LoginScreen(Screen):
             
             try:
                 # Fetch Device Code Flow URL and User Code
-                code_data = await self.ms.get_oauth_code(client_id, client_secret)
+                code_data = await self.ms.get_oauth_device_code(client_id, client_secret)
                 
                 # Show OAuth directions panel
                 self.query_one("#oauth-details-container").display = True
@@ -192,9 +192,9 @@ class LoginScreen(Screen):
                 for lbl in self.query(".login-field-lbl"):
                     lbl.display = False
                 
-                # Start background polling task
+                # Start background polling task using Textual run_worker
                 self.device_code = code_data["device_code"]
-                self.poll_task = asyncio.create_task(
+                self.poll_task = self.run_worker(
                     self.poll_for_auth(client_id, client_secret, code_data["device_code"], code_data.get("interval", 5))
                 )
             except Exception as e:
@@ -202,9 +202,12 @@ class LoginScreen(Screen):
                 self.query_one("#polling-status-lbl", Label).update(f"⚠️ Error: {str(e)}")
 
     async def poll_for_auth(self, client_id: str, client_secret: str, device_code: str, interval: int):
-        """Polls Google OAuth servers until token is issued or expires."""
-        while True:
+        """Polls Google OAuth servers until token is issued, expires, or times out (30 mins)."""
+        max_attempts = 360  # 30 minutes / 5-second interval
+        attempts = 0
+        while attempts < max_attempts:
             await asyncio.sleep(interval)
+            attempts += 1
             try:
                 token_data = await self.ms.poll_oauth_token(client_id, client_secret, device_code)
                 if token_data and "access_token" in token_data:
@@ -212,6 +215,7 @@ class LoginScreen(Screen):
                     await self.ms.save_oauth_session(client_id, client_secret, token_data)
                     self.query_one("#polling-status-lbl", Label).update("✅ Connected successfully! Redirecting...")
                     await asyncio.sleep(1.5)
+                    self.post_message(self.LoginSuccess())
                     self.dismiss(True)
                     break
             except Exception as e:
@@ -221,8 +225,14 @@ class LoginScreen(Screen):
                     self.query_one("#polling-status-lbl", Label).update(f"⚠️ Auth error: {str(e)}")
                     self.query_one("#connect-btn", Button).disabled = False
                     break
+        else:
+            self.query_one("#polling-status-lbl", Label).update("⚠️ Verification timed out. Please try again.")
+            self.query_one("#connect-btn", Button).disabled = False
 
     def on_unmount(self):
         """Ensure background polling task is canceled when leaving screen."""
-        if self.poll_task and not self.poll_task.done():
-            self.poll_task.cancel()
+        if self.poll_task:
+            try:
+                self.poll_task.cancel()
+            except Exception:
+                pass

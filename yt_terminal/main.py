@@ -1,21 +1,20 @@
 # Main Application Orchestrator for YT-Terminal
 
 import os
-import sys
+import tempfile
 import asyncio
 import logging
 import time
-import hashlib
 from yt_terminal.config_manager import ConfigManager
 
 logging.basicConfig(
-    filename="/tmp/yt-terminal.log",
+    filename=os.path.join(tempfile.gettempdir(), "yt-terminal.log"),
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 log = logging.getLogger("yt-terminal")
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Label, ListView
+from textual.widgets import Header, Footer, ListView
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.binding import Binding
@@ -30,6 +29,7 @@ from yt_terminal.widgets.search_overlay import SearchOverlay
 from yt_terminal.music_service import MusicService, Track
 from yt_terminal.audio_player import AudioPlayer
 from yt_terminal.theme_engine import download_and_extract, generate_tcss
+from yt_terminal.presets import DEFAULT_FALLBACK_TRACKS
 
 # Determine standard base asset paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -49,6 +49,8 @@ class YTTerminalApp(App):
         Binding("w", "toggle_art_lyrics", "Lyrics + Art", show=True),
         Binding("slash", "search_overlay", "Search", show=True),
         Binding("a", "sync_account", "Sync Account", show=True),
+        Binding("plus", "volume_up", "Vol +", show=True),
+        Binding("minus", "volume_down", "Vol -", show=True),
         Binding("q", "quit", "Quit Player", show=True),
     ]
     
@@ -57,6 +59,9 @@ class YTTerminalApp(App):
     is_playing = reactive(False)
     current_time = reactive(0.0)
     track_duration = reactive(0.0)
+    shuffle_mode = reactive(False)
+    repeat_mode = reactive("off")
+    volume_level = reactive(80)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -68,6 +73,7 @@ class YTTerminalApp(App):
         self._lyrics_task = None
         self._queue_task = None
         self._skip_autoplay_update = False  # Prevent double queue race
+        self._last_track_load_time = 0.0
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -106,8 +112,8 @@ class YTTerminalApp(App):
                 self.player_pane.display = True
                 self.eq_pane.display = True
                 self.query_one("#right-pane").display = True
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Error in on_resize: {e}")
 
     def on_mount(self) -> None:
         """Runs initialization check when TUI loads."""
@@ -140,7 +146,19 @@ class YTTerminalApp(App):
             log.info("No liked songs — falling back to search")
             liked_tracks = await self.ms.search("LANY Malibu Nights")
             
+        if not liked_tracks:
+            log.info("Search fallback returned 0 tracks — seeding curated default tracks")
+            liked_tracks = DEFAULT_FALLBACK_TRACKS
+
         if liked_tracks:
+            # Sync initial volumes and states to pane and player
+            if hasattr(self, "player_pane") and self.player_pane:
+                self.player_pane.shuffle_mode = self.shuffle_mode
+                self.player_pane.repeat_mode = self.repeat_mode
+                self.player_pane.volume_level = self.volume_level
+            if self.player:
+                self.player.set_volume(self.volume_level)
+
             self.queue = liked_tracks
             self.queue_view.queue_data = self.queue
             self._skip_autoplay_update = True
@@ -151,6 +169,8 @@ class YTTerminalApp(App):
 
         # Start background polling timer for mpv timeline position
         self.set_interval(0.5, self.update_playback_timeline)
+        # Start background visualizer feeding at 25 FPS
+        self.set_interval(0.04, self.feed_visualizer)
 
     def load_track(self, index: int):
         """Loads and starts audio streaming for a selected queue track."""
@@ -215,12 +235,9 @@ class YTTerminalApp(App):
         tcss_str = generate_tcss(theme_vars)
         self.stylesheet.add_source(tcss_str)
         
-        # Locate path of cached thumbnail using config hash
-        url_hash = hashlib.md5(track.thumbnail_url.encode("utf-8")).hexdigest()
-        cache_path = ConfigManager.CACHE_DIR / f"{url_hash}.jpg"
-        
-        if cache_path.exists():
-            self.player_pane.artwork_path = str(cache_path)
+        art_path = theme_vars.get("artwork_path", "")
+        if art_path and os.path.exists(art_path):
+            self.player_pane.artwork_path = art_path
 
     async def update_track_lyrics(self, track: Track):
         """Loads lyrics from YouTube Music API asynchronously."""
@@ -228,14 +245,42 @@ class YTTerminalApp(App):
         self.lyrics_view.lyrics_data = lyrics
 
     async def update_autoplay_queue(self, track: Track):
-        """Pulls Autoplay/Up Next queue list from active track."""
+        """Pulls Autoplay/Up Next queue list from active track without discarding current queue."""
+        # Only fetch/update autoplay if:
+        # 1. The queue has only 1 track (single song selection) OR
+        # 2. We are playing the last song of the current queue (to append next recommendations)
+        if len(self.queue) > 1 and self.active_track_index < len(self.queue) - 1:
+            log.info("[Autoplay] Playing middle of queue. Autoplay fetch skipped to preserve queue.")
+            return
+
+        log.info(f"[Autoplay] Fetching suggestions for: {track.title}")
         next_tracks = await self.ms.get_up_next_queue(track.video_id)
-        if next_tracks:
-            # Splice in active track at start followed by autoplay suggestions
+        if not next_tracks:
+            return
+
+        if len(self.queue) <= 1:
+            # Single song playing: replace queue with [active track] + suggestions
             self.queue = [track] + next_tracks
             self.queue_view.queue_data = self.queue
-            # DON'T reset active_track_index here — it causes cascade re-plays
             self.queue_view.current_index = 0
+            log.info(f"[Autoplay] Single track queue populated with {len(self.queue)} tracks.")
+        else:
+            # Multi-song queue, and we are playing the last song: append suggestions (filtering out duplicates)
+            existing_ids = {t.video_id for t in self.queue}
+            appended_count = 0
+            new_tracks = []
+            for t in next_tracks:
+                if t.video_id not in existing_ids:
+                    new_tracks.append(t)
+                    existing_ids.add(t.video_id)
+                    appended_count += 1
+            
+            if new_tracks:
+                self.queue = self.queue + new_tracks
+                self.queue_view.queue_data = self.queue
+                # Keep current index correct
+                self.queue_view.current_index = self.active_track_index
+                log.info(f"[Autoplay] Appended {appended_count} recommendations to the end of the queue.")
 
     def update_playback_timeline(self):
         """Queries background mpv process for position and checks song ends."""
@@ -251,12 +296,12 @@ class YTTerminalApp(App):
         # Avoid temporary 0.0 read glitches from mpv during stream buffering
         if pos == 0.0 and self.current_time > 2.0:
             now = time.time()
-            if not (hasattr(self, '_last_track_load_time') and (now - self._last_track_load_time) < 8.0):
+            if not ((now - self._last_track_load_time) < 8.0):
                 pos = self.current_time
 
         # Only update live duration if we are out of the 8-second initial loading period
         now = time.time()
-        is_loading = hasattr(self, '_last_track_load_time') and (now - self._last_track_load_time) < 8.0
+        is_loading = (now - self._last_track_load_time) < 8.0
 
         if not is_loading and dur and dur > 0:
             self.track_duration = dur
@@ -284,7 +329,32 @@ class YTTerminalApp(App):
         # Require dur > 10 to avoid false positives from mpv returning 0
         if dur > 10 and pos >= (dur - 1.0):
             log.info(f"Track finished (pos={pos:.1f}, dur={dur:.1f}) — advancing to next track")
-            self.action_next_track()
+            self.action_next_track(is_auto_advance=True)
+
+    def watch_shuffle_mode(self, val: bool) -> None:
+        if hasattr(self, "player_pane") and self.player_pane:
+            self.player_pane.shuffle_mode = val
+
+    def watch_repeat_mode(self, val: str) -> None:
+        if hasattr(self, "player_pane") and self.player_pane:
+            self.player_pane.repeat_mode = val
+
+    def watch_volume_level(self, val: int) -> None:
+        if hasattr(self, "player_pane") and self.player_pane:
+            self.player_pane.volume_level = val
+
+    def feed_visualizer(self) -> None:
+        """Feeds the live mpv audio levels to the spectrum visualizer at a fast interval."""
+        if not self.is_playing or not self.player:
+            if hasattr(self, "eq_pane") and self.eq_pane and hasattr(self.eq_pane, "visualizer") and self.eq_pane.visualizer:
+                self.eq_pane.visualizer.audio_level = 0.0
+                self.eq_pane.visualizer.is_playing = False
+            return
+
+        amp = self.player.get_audio_level()
+        if hasattr(self, "eq_pane") and self.eq_pane and hasattr(self.eq_pane, "visualizer") and self.eq_pane.visualizer:
+            self.eq_pane.visualizer.audio_level = amp
+            self.eq_pane.visualizer.is_playing = True
 
     # --- Hotkey Actions ---
 
@@ -295,15 +365,72 @@ class YTTerminalApp(App):
         self.player_pane.is_playing = self.is_playing
         self.eq_pane.visualizer.anim_active = self.is_playing
 
-    def action_next_track(self) -> None:
-        if self.queue and len(self.queue) > 1:
-            next_idx = (self.active_track_index + 1) % len(self.queue)
+    def action_next_track(self, is_auto_advance: bool = False) -> None:
+        if not self.queue:
+            return
+
+        if is_auto_advance and self.repeat_mode == "one":
+            log.info("Auto-advance: repeat_mode is 'one', replaying current track")
+            self.load_track(self.active_track_index)
+            return
+
+        if self.shuffle_mode and len(self.queue) > 1:
+            import random
+            choices = [i for i in range(len(self.queue)) if i != self.active_track_index]
+            next_idx = random.choice(choices)
+            log.info(f"Shuffle mode active: selected random track index {next_idx}")
             self.load_track(next_idx)
+        else:
+            next_idx = self.active_track_index + 1
+            if next_idx >= len(self.queue):
+                if self.repeat_mode == "all":
+                    log.info("Queue wrapped around (repeat_mode='all')")
+                    self.load_track(0)
+                else:
+                    # repeat_mode == "off"
+                    if is_auto_advance:
+                        log.info("Queue finished (repeat_mode='off') — pausing playback gracefully")
+                        self.is_playing = False
+                        if self.player:
+                            self.player.set_pause(True)
+                        self.player_pane.is_playing = False
+                        self.eq_pane.visualizer.anim_active = False
+                    else:
+                        log.info("Manual next at end of queue — wrap around to index 0")
+                        self.load_track(0)
+            else:
+                self.load_track(next_idx)
 
     def action_prev_track(self) -> None:
-        if self.queue and len(self.queue) > 1:
-            prev_idx = (self.active_track_index - 1) % len(self.queue)
+        if not self.queue:
+            return
+
+        if self.shuffle_mode and len(self.queue) > 1:
+            import random
+            choices = [i for i in range(len(self.queue)) if i != self.active_track_index]
+            prev_idx = random.choice(choices)
+            log.info(f"Shuffle mode active: selected random track index {prev_idx} for prev track")
             self.load_track(prev_idx)
+        else:
+            prev_idx = self.active_track_index - 1
+            if prev_idx < 0:
+                prev_idx = len(self.queue) - 1
+                log.info("Manual prev at start of queue — wrap around to end")
+            self.load_track(prev_idx)
+
+    def action_volume_up(self) -> None:
+        if self.player:
+            new_vol = min(100, self.volume_level + 5)
+            self.player.set_volume(new_vol)
+            self.volume_level = new_vol
+            log.info(f"Volume increased to {new_vol}%")
+
+    def action_volume_down(self) -> None:
+        if self.player:
+            new_vol = max(0, self.volume_level - 5)
+            self.player.set_volume(new_vol)
+            self.volume_level = new_vol
+            log.info(f"Volume decreased to {new_vol}%")
 
     def action_search_overlay(self) -> None:
         """Opens search modal overlay."""
@@ -315,8 +442,8 @@ class YTTerminalApp(App):
             layout = self.query_one("#main-layout")
             layout.remove_class("expanded-art-lyrics-active")
             layout.toggle_class("fullscreen-lyrics-active")
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Failed to toggle fullscreen lyrics: {e}")
 
     def action_toggle_art_lyrics(self) -> None:
         """Toggles Apple Music style expanded album art with lyrics mode."""
@@ -324,8 +451,8 @@ class YTTerminalApp(App):
             layout = self.query_one("#main-layout")
             layout.remove_class("fullscreen-lyrics-active")
             layout.toggle_class("expanded-art-lyrics-active")
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Failed to toggle art lyrics: {e}")
 
     def action_sync_account(self) -> None:
         """Triggers manual YouTube Music authentication / Re-sync screen."""
@@ -337,8 +464,8 @@ class YTTerminalApp(App):
                 self.is_playing = False
                 self.player_pane.is_playing = False
                 self.eq_pane.visualizer.anim_active = False
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Failed to pause player before sync: {e}")
         
         self.push_screen(LoginScreen(self.ms), callback=self.on_login_completed)
 
@@ -358,6 +485,19 @@ class YTTerminalApp(App):
 
     def on_player_pane_prev_track(self, message: PlayerPane.PrevTrack) -> None:
         self.action_prev_track()
+
+    def on_player_pane_shuffle_toggle(self, message: PlayerPane.ShuffleToggle) -> None:
+        self.shuffle_mode = not self.shuffle_mode
+        log.info(f"Shuffle mode toggled: {self.shuffle_mode}")
+
+    def on_player_pane_repeat_toggle(self, message: PlayerPane.RepeatToggle) -> None:
+        if self.repeat_mode == "off":
+            self.repeat_mode = "all"
+        elif self.repeat_mode == "all":
+            self.repeat_mode = "one"
+        else:
+            self.repeat_mode = "off"
+        log.info(f"Repeat mode toggled: {self.repeat_mode}")
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Triggers playlist/queue track jumps on song card click."""

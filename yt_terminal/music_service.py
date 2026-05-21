@@ -1,34 +1,34 @@
 import asyncio
+import time
 import os
 import json
-import requests
 import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from ytmusicapi import YTMusic, OAuthCredentials
 from yt_terminal.config_manager import ConfigManager
+from dataclasses import dataclass
 
 log = logging.getLogger("yt-terminal")
 
+@dataclass
 class Track:
     """Unified Track representation for TUI player."""
-    def __init__(
-        self,
-        video_id: str,
-        title: str,
-        artist: str,
-        album: str,
-        duration_seconds: int,
-        thumbnail_url: str = "",
-        lyrics_id: Optional[str] = None
-    ):
-        self.video_id = video_id
-        self.title = title
-        self.artist = artist
-        self.album = album
-        self.duration_seconds = duration_seconds
-        self.thumbnail_url = thumbnail_url
-        self.lyrics_id = lyrics_id
+    video_id: str
+    title: str
+    artist: str
+    album: str
+    duration_seconds: int
+    thumbnail_url: str = ""
+    lyrics_id: Optional[str] = None
+
+    def __eq__(self, other):
+        if not isinstance(other, Track):
+            return NotImplemented
+        return self.video_id == other.video_id
+
+    def __hash__(self):
+        return hash(self.video_id)
 
     def to_dict(self) -> dict:
         return {
@@ -41,12 +41,31 @@ class Track:
         }
 
 
+class MemoryCache:
+    """In-memory TTL cache to optimize API calls."""
+    def __init__(self):
+        self._cache = {}
+
+    def get(self, key: Any) -> Optional[Any]:
+        if key in self._cache:
+            val, expire_at = self._cache[key]
+            if time.time() < expire_at:
+                return val
+            else:
+                del self._cache[key]
+        return None
+
+    def set(self, key: Any, val: Any, ttl_seconds: float):
+        self._cache[key] = (val, time.time() + ttl_seconds)
+
+
 class MusicService:
     """Headless API Service wrapping ytmusicapi securely using async thread pools."""
     
     def __init__(self):
         self.yt: Optional[YTMusic] = None
         self.yt_public = YTMusic()  # Clean unauthenticated public fallback
+        self._cache = MemoryCache()
         self._init_client()
 
     def _init_client(self):
@@ -56,48 +75,37 @@ class MusicService:
             # Self-healing OAUTH_FILE parse to strip unsupported 'refresh_token_expires_in' key
             if ConfigManager.OAUTH_FILE.exists():
                 try:
-                    import json
                     with open(ConfigManager.OAUTH_FILE, "r") as f:
                         data = json.load(f)
                     if isinstance(data, dict) and "refresh_token_expires_in" in data:
                         del data["refresh_token_expires_in"]
                         with open(ConfigManager.OAUTH_FILE, "w") as f:
                             json.dump(data, f, indent=4)
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.warning(f"Failed to normalize OAuth file: {e}")
 
-            client_id, client_secret = ConfigManager.get_credentials()
             try:
-                if client_id and client_secret:
-                    # Initialize authenticated client with OAuthCredentials
-                    self.yt = YTMusic(
-                        str(ConfigManager.OAUTH_FILE),
-                        oauth_credentials=OAuthCredentials(client_id, client_secret)
-                    )
-                else:
-                    self.yt = YTMusic(str(ConfigManager.OAUTH_FILE))
-            except Exception:
-                # If loading authenticated client fails, fall back to unauthenticated
-                self.yt = YTMusic()
-        else:
-            self.yt = YTMusic()
+                self.yt = YTMusic(str(ConfigManager.OAUTH_FILE))
+            except Exception as e:
+                log.error(f"Failed to initialize authenticated YTMusic: {e}")
+                self.yt = None
 
     def is_authenticated(self) -> bool:
-        """Returns True if the client is authenticated."""
-        return ConfigManager.is_authenticated()
+        """Returns True if authenticated client is ready."""
+        return self.yt is not None
 
-    # --- Authentication (OAuth Flow) ---
+    # --- Authentication Flow ---
 
-    async def get_oauth_code(self, client_id: str, client_secret: str) -> dict:
-        """Starts device code authorization flow."""
-        def _get_code():
+    async def get_oauth_device_code(self, client_id: str, client_secret: str) -> dict:
+        """Starts device code OAuth flow."""
+        def _get():
             creds = OAuthCredentials(client_id, client_secret)
             return creds.get_code()
-        
-        return await asyncio.to_thread(_get_code)
+            
+        return await asyncio.to_thread(_get)
 
-    async def poll_oauth_token(self, client_id: str, client_secret: str, device_code: str) -> dict:
-        """Polls for OAuth token, returns token dict or raises exception if pending."""
+    async def poll_oauth_token(self, client_id: str, client_secret: str, device_code: dict) -> dict:
+        """Polls for OAuth token after user authorizes application."""
         def _poll():
             creds = OAuthCredentials(client_id, client_secret)
             return creds.token_from_code(device_code)
@@ -113,9 +121,29 @@ class MusicService:
             # Write token_data out directly as oauth.json
             with open(ConfigManager.OAUTH_FILE, "w") as f:
                 json.dump(token_data, f, indent=4)
+            try:
+                os.chmod(ConfigManager.OAUTH_FILE, 0o600)
+            except Exception as e:
+                log.debug(f"Failed to set permissions on OAuth file: {e}")
                 
         await asyncio.to_thread(_save)
         self._init_client()
+
+    # --- Dynamic Public Fallback Helper ---
+
+    async def _with_public_fallback(self, fn_auth_name: str, fn_public, *args, **kwargs):
+        """Executes API function with authentication first, falling back to public client on error."""
+        if self.yt:
+            try:
+                fn_auth = getattr(self.yt, fn_auth_name)
+                return await asyncio.to_thread(fn_auth, *args, **kwargs)
+            except Exception as e:
+                log.warning(f"Authenticated {fn_auth_name} failed ({e}) — falling back to public client")
+        try:
+            return await asyncio.to_thread(fn_public, *args, **kwargs)
+        except Exception as e:
+            log.warning(f"Public fallback call for {fn_auth_name} failed: {e}")
+            return None
 
     # --- API Endpoints ---
 
@@ -125,7 +153,8 @@ class MusicService:
             return []
         try:
             return await asyncio.to_thread(self.yt.get_library_playlists, limit=25)
-        except Exception:
+        except Exception as e:
+            log.warning(f"Failed to fetch library playlists: {e}")
             return []
 
     async def get_liked_songs(self, limit: int = 30) -> List[Track]:
@@ -135,120 +164,114 @@ class MusicService:
         try:
             raw_liked = await asyncio.to_thread(self.yt.get_liked_songs, limit=limit)
             return self._parse_tracks(raw_liked.get("tracks", []))
-        except Exception:
+        except Exception as e:
+            log.warning(f"Failed to fetch Liked Songs: {e}")
             return []
 
     async def get_playlist_tracks(self, playlist_id: str, limit: int = 50) -> List[Track]:
         """Gets tracks from a playlist with robust public fallback."""
-        if self.yt:
-            try:
-                playlist = await asyncio.to_thread(self.yt.get_playlist, playlist_id, limit=limit)
-                return self._parse_tracks(playlist.get("tracks", []))
-            except Exception as e:
-                log.warning(f"Authenticated get_playlist failed ({e}) — falling back to public client")
-
-        try:
-            playlist = await asyncio.to_thread(self.yt_public.get_playlist, playlist_id, limit=limit)
-            return self._parse_tracks(playlist.get("tracks", []))
-        except Exception:
-            return []
+        playlist = await self._with_public_fallback(
+            "get_playlist",
+            self.yt_public.get_playlist,
+            playlist_id,
+            limit=limit
+        )
+        return self._parse_tracks(playlist.get("tracks", [])) if playlist else []
 
     async def search(self, query: str, filter_type: str = "songs") -> List[Track]:
         """Searches YouTube Music for tracks with robust public fallback."""
-        if self.yt:
-            try:
-                results = await asyncio.to_thread(self.yt.search, query, filter=filter_type, limit=20)
-                return self._parse_tracks(results)
-            except Exception as e:
-                log.warning(f"Authenticated search failed ({e}) — falling back to public client")
-
-        try:
-            results = await asyncio.to_thread(self.yt_public.search, query, filter=filter_type, limit=20)
-            return self._parse_tracks(results)
-        except Exception:
-            return []
+        results = await self._with_public_fallback(
+            "search",
+            self.yt_public.search,
+            query,
+            filter=filter_type,
+            limit=20
+        )
+        return self._parse_tracks(results) if results else []
 
     async def get_search_suggestions(self, query: str) -> List[str]:
-        """Gets autocomplete search recommendations with robust public fallback."""
+        """Gets autocomplete search recommendations with TTL caching and robust public fallback."""
         if not query.strip():
             return []
-        if self.yt:
-            try:
-                return await asyncio.to_thread(self.yt.get_search_suggestions, query)
-            except Exception as e:
-                log.warning(f"Authenticated suggestions failed ({e}) — falling back to public client")
-        
-        try:
-            return await asyncio.to_thread(self.yt_public.get_search_suggestions, query)
-        except Exception:
-            return []
+        cache_key = f"suggestions:{query}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        suggestions = await self._with_public_fallback(
+            "get_search_suggestions",
+            self.yt_public.get_search_suggestions,
+            query
+        )
+        res = suggestions if suggestions else []
+        self._cache.set(cache_key, res, 60.0)
+        return res
 
     async def get_album_tracks(self, album_id: str) -> List[Track]:
         """Gets individual tracks listed within a YouTube Music album with robust public fallback."""
-        if self.yt:
-            try:
-                album = await asyncio.to_thread(self.yt.get_album, album_id)
-                return self._parse_tracks(album.get("tracks", []))
-            except Exception as e:
-                log.warning(f"Authenticated get_album failed ({e}) — falling back to public client")
-
-        try:
-            album = await asyncio.to_thread(self.yt_public.get_album, album_id)
-            return self._parse_tracks(album.get("tracks", []))
-        except Exception:
-            return []
+        album = await self._with_public_fallback(
+            "get_album",
+            self.yt_public.get_album,
+            album_id
+        )
+        return self._parse_tracks(album.get("tracks", [])) if album else []
 
     async def get_up_next_queue(self, video_id: str) -> List[Track]:
-        """Gets the autoplay/related songs queue from watch playlist with robust public fallback."""
-        if self.yt:
-            try:
-                watch_data = await asyncio.to_thread(self.yt.get_watch_playlist, videoId=video_id, limit=15)
-                return self._parse_tracks(watch_data.get("tracks", []))
-            except Exception as e:
-                log.warning(f"Authenticated get_watch_playlist failed ({e}) — falling back to public client")
+        """Gets the autoplay/related songs queue from watch playlist with TTL caching and public fallback."""
+        cache_key = f"watch_playlist:{video_id}"
+        watch_data = self._cache.get(cache_key)
+        if watch_data is None:
+            watch_data = await self._with_public_fallback(
+                "get_watch_playlist",
+                self.yt_public.get_watch_playlist,
+                videoId=video_id,
+                limit=15
+            )
+            if watch_data:
+                self._cache.set(cache_key, watch_data, 300.0)
 
-        try:
-            watch_data = await asyncio.to_thread(self.yt_public.get_watch_playlist, videoId=video_id, limit=15)
-            return self._parse_tracks(watch_data.get("tracks", []))
-        except Exception:
-            return []
+        return self._parse_tracks(watch_data.get("tracks", [])) if watch_data else []
 
     async def get_lyrics(self, video_id: str) -> List[Dict[str, Any]]:
-        """Gets synced or static lyrics with robust public fallback."""
-        watch_data = None
-        if self.yt:
-            try:
-                watch_data = await asyncio.to_thread(self.yt.get_watch_playlist, videoId=video_id)
-            except Exception as e:
-                log.warning(f"Authenticated get_watch_playlist for lyrics failed ({e}) — falling back to public client")
+        """Gets synced or static lyrics with TTL caching and robust public fallback."""
+        lyrics_cache_key = f"lyrics:{video_id}"
+        cached_lyrics = self._cache.get(lyrics_cache_key)
+        if cached_lyrics is not None:
+            return cached_lyrics
+
+        wp_cache_key = f"watch_playlist:{video_id}"
+        watch_data = self._cache.get(wp_cache_key)
+        if watch_data is None:
+            watch_data = await self._with_public_fallback(
+                "get_watch_playlist",
+                self.yt_public.get_watch_playlist,
+                videoId=video_id
+            )
+            if watch_data:
+                self._cache.set(wp_cache_key, watch_data, 300.0)
 
         if not watch_data:
-            try:
-                watch_data = await asyncio.to_thread(self.yt_public.get_watch_playlist, videoId=video_id)
-            except Exception:
-                return []
+            return []
 
         lyrics_id = watch_data.get("lyrics")
         if not lyrics_id:
             return []
 
-        raw_lyrics = None
-        if self.yt:
-            try:
-                raw_lyrics = await asyncio.to_thread(self.yt.get_lyrics, lyrics_id)
-            except Exception as e:
-                log.warning(f"Authenticated get_lyrics failed ({e}) — falling back to public client")
-
+        raw_lyrics = await self._with_public_fallback(
+            "get_lyrics",
+            self.yt_public.get_lyrics,
+            lyrics_id
+        )
         if not raw_lyrics:
-            try:
-                raw_lyrics = await asyncio.to_thread(self.yt_public.get_lyrics, lyrics_id)
-            except Exception:
-                return []
+            return []
 
         try:
             text = raw_lyrics.get("lyrics", "")
-            return self._parse_lyrics_from_watch_and_text(watch_data, text)
-        except Exception:
+            res = self._parse_lyrics_from_watch_and_text(watch_data, text)
+            self._cache.set(lyrics_cache_key, res, 600.0)
+            return res
+        except Exception as e:
+            log.warning(f"Failed to parse lyrics: {e}")
             return []
 
     def _parse_lyrics_from_watch_and_text(self, watch_data: dict, text: str) -> List[Dict[str, Any]]:
@@ -347,13 +370,15 @@ class MusicService:
                 except ValueError:
                     duration_sec = 0
 
-            # Get largest thumbnail URL
+            # Get largest thumbnail URL using O(n) max lookup
             thumbnails = track.get("thumbnails", [])
             thumb_url = ""
             if thumbnails:
                 # Use largest resolution available
-                sorted_thumbs = sorted(thumbnails, key=lambda x: x.get("width", 0), reverse=True)
-                thumb_url = sorted_thumbs[0].get("url", "")
+                try:
+                    thumb_url = max(thumbnails, key=lambda x: x.get("width", 0)).get("url", "")
+                except Exception:
+                    pass
 
             parsed.append(Track(
                 video_id=video_id,

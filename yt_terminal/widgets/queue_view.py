@@ -12,6 +12,13 @@ import logging
 import hashlib
 log = logging.getLogger("yt-terminal")
 
+class TrackListItem(ListItem):
+    """Structured subclass representing a track item in a list."""
+    def __init__(self, child: Widget, track: Track, track_index: int, **kwargs):
+        super().__init__(child, **kwargs)
+        self.track = track
+        self.track_index = track_index
+
 class QueueItemWidget(Widget):
     """Renders a single song card in the playlist queue."""
     def __init__(self, track_info: Track, **kwargs):
@@ -41,9 +48,13 @@ class QueueItemWidget(Widget):
 
 class QueueView(Widget):
     """Displays the upcoming tracks queue list."""
-    queue_data = reactive([])  # List of Track objects
+    queue_data = reactive(list)  # List of Track objects
     current_index = reactive(0)
-    _update_counter = 0  # Unique ID counter to avoid DuplicateIds
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.list_items = []
+        self._last_active_idx = -1
 
     def compose(self):
         self.border_title = "Up Next / AutoPlay"
@@ -81,6 +92,7 @@ class QueueView(Widget):
                 pass
 
         self.list_items = []
+        self._last_active_idx = -1
         
         if not new_val:
             log.info("[QueueView] queue_data is empty, appending empty message")
@@ -90,9 +102,7 @@ class QueueView(Widget):
         log.info(f"[QueueView] Appending {len(new_val)} tracks to ListView")
         for i, track in enumerate(new_val):
             widget = QueueItemWidget(track)
-            item = ListItem(widget)
-            item.track = track
-            item.track_index = i
+            item = TrackListItem(widget, track=track, track_index=i)
             lv.append(item)
             self.list_items.append(item)
 
@@ -106,9 +116,23 @@ class QueueView(Widget):
         if not hasattr(self, "list_items") or not self.list_items:
             return
             
-        for i, item in enumerate(self.list_items):
-            if i == index:
-                item.add_class("active-track")
-                item.scroll_visible(animate=True)
-            else:
-                item.remove_class("active-track")
+        if index < 0 or index >= len(self.list_items):
+            return
+
+        old_idx = self._last_active_idx
+        self._last_active_idx = index
+
+        # Remove active class from previous item
+        if old_idx != -1 and old_idx < len(self.list_items):
+            try:
+                self.list_items[old_idx].remove_class("active-track")
+            except Exception:
+                pass
+
+        # Add active class to new item and scroll it into view
+        try:
+            item = self.list_items[index]
+            item.add_class("active-track")
+            item.scroll_visible(animate=True)
+        except Exception:
+            pass
