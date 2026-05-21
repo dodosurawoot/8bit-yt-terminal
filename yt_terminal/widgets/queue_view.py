@@ -9,6 +9,7 @@ from textual.reactive import reactive
 from yt_terminal.music_service import Track
 
 import logging
+import hashlib
 log = logging.getLogger("yt-terminal")
 
 class QueueItemWidget(Widget):
@@ -19,7 +20,6 @@ class QueueItemWidget(Widget):
 
     def compose(self):
         # Generate stable dynamic pastel color from track metadata
-        import hashlib
         track_str = f"{self.track.title or ''}-{self.track.artist or ''}"
         h = hashlib.md5(track_str.encode("utf-8")).hexdigest()
         # Generate premium warm colors (100-227 range)

@@ -2,16 +2,17 @@
 
 import os
 import logging
+from PIL import Image
 from colorthief import ColorThief
 
 # Fallback premium dark theme palette
 DEFAULT_THEME = {
-    "primary_bg": "#1c1216",      # Deeper dark rose (near-black)
-    "panel_bg": "#2a1a22",        # Slightly lighter rose panel
-    "accent": "#e8959a",          # Dusty pink/accent pop
-    "text_primary": "#fff0f0",    # Warm white/light pink
-    "text_muted": "#7a5a68",      # Muted mauve text
-    "border": "#3c2633"           # Subtle rose border
+    "primary_bg": "#0a0b10",      # Deep obsidian
+    "panel_bg": "#131520",        # Translucent glass panel
+    "accent": "#00f3ff",          # Cyber cyan
+    "text_primary": "#f5f6fa",    # Ice white
+    "text_muted": "#686d80",      # Translucent slate-gray
+    "border": "#262938"           # Sleek rounded border tint
 }
 
 def rgb_to_hex(rgb):
@@ -100,6 +101,13 @@ def download_and_extract(thumbnail_url: str) -> dict:
             if r.status_code == 200:
                 with open(cache_path, "wb") as f:
                     f.write(r.content)
+                # Optimize image size for ColorThief palette extraction
+                try:
+                    with Image.open(cache_path) as img:
+                        img.thumbnail((64, 64))
+                        img.save(cache_path, "JPEG")
+                except Exception as e:
+                    logging.warning(f"Failed to downscale cached thumbnail: {e}")
             else:
                 return DEFAULT_THEME.copy()
         except Exception as e:

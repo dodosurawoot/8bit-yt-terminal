@@ -13,10 +13,14 @@ from rich.text import Text
 class AlbumArt(Widget):
     """Renders the album art image as retro 8-bit colored pixel art."""
     image_path = reactive(None)
+    rendered_art = reactive(None)
 
-    def render(self) -> Text:
-        if not self.image_path or not os.path.exists(self.image_path):
-            # Fallback mockup logo when image is missing
+    def watch_image_path(self, new_path: str | None) -> None:
+        """Reactively pre-renders the artwork when the path changes."""
+        self.rendered_art = self._pre_render(new_path)
+
+    def _pre_render(self, path: str | None) -> Text:
+        if not path or not os.path.exists(path):
             fallback_text = (
                 "\n\n"
                 "   .------.  \n"
@@ -31,7 +35,7 @@ class AlbumArt(Widget):
         
         try:
             # Open image, downscale and quantize colors for 8-bit styling
-            img = Image.open(self.image_path)
+            img = Image.open(path)
             w, h = 32, 24
             img = img.resize((w, h), Image.Resampling.NEAREST)
             # Quantize color palette to 16 colors for dithered/retro console look
@@ -50,6 +54,11 @@ class AlbumArt(Widget):
             return Text.from_markup("\n".join(lines))
         except Exception as e:
             return Text(f"\n\n Error loading art:\n {str(e)}")
+
+    def render(self) -> Text:
+        if self.rendered_art is None:
+            self.rendered_art = self._pre_render(self.image_path)
+        return self.rendered_art
 
 class PlayerPane(Widget):
     """The Left Pane showing active song info, artwork, and control bindings."""

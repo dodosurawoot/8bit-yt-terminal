@@ -5,6 +5,8 @@ import sys
 import asyncio
 import logging
 import time
+import hashlib
+from yt_terminal.config_manager import ConfigManager
 
 logging.basicConfig(
     filename="/tmp/yt-terminal.log",
@@ -213,8 +215,6 @@ class YTTerminalApp(App):
         self.stylesheet.add_source(tcss_str)
         
         # Locate path of cached thumbnail using config hash
-        import hashlib
-        from yt_terminal.config_manager import ConfigManager
         url_hash = hashlib.md5(track.thumbnail_url.encode("utf-8")).hexdigest()
         cache_path = ConfigManager.CACHE_DIR / f"{url_hash}.jpg"
         

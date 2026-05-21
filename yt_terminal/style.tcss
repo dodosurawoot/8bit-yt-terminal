@@ -1,11 +1,12 @@
-/* Base TCSS Stylesheet for YT-Terminal */
+/* Premium Obsidian Synthwave TCSS Stylesheet for YT-Terminal */
 
-$primary-bg: #1c1216;      /* Deeper dark rose (near-black) */
-$panel-bg: #2a1a22;        /* Slightly lighter rose panel */
-$accent: #e8959a;          /* Dusty pink/accent pop */
-$text-primary: #fff0f0;    /* Warm white/light pink */
-$text-muted: #7a5a68;      /* Muted mauve text */
-$border: #3c2633;          /* Subtle rose border */
+$primary-bg: #0a0b10;      /* Deep obsidian midnight */
+$panel-bg: #131520;        /* Translucent glass panel */
+$accent: #00f3ff;          /* Cyber cyan accent */
+$accent-pink: #ff2a7a;     /* Synthwave hot pink accent */
+$text-primary: #f5f6fa;    /* Crisp ice-white text */
+$text-muted: #686d80;      /* Translucent slate-gray text */
+$border: #262938;          /* Rounded border tint */
 
 * {
     transition: background 800ms;
@@ -44,7 +45,7 @@ Screen {
     height: 100%;
     background: $panel-bg;
     border: round $border;
-    border-title-color: $accent;
+    border-title-color: $accent-pink;
     border-title-style: bold;
     padding: 1 1;
     margin: 0 1 0 0;
@@ -72,7 +73,7 @@ Screen {
     height: 55%;
     background: $panel-bg;
     border: round $border;
-    border-title-color: $accent;
+    border-title-color: $accent-pink;
     border-title-style: bold;
     padding: 0 1;
     layout: vertical;
@@ -82,7 +83,7 @@ Screen {
 AlbumArt {
     width: 36;
     height: 14;
-    border: round $border;
+    border: round $accent;
     margin: 1 0;
     background: $primary-bg;
     content-align: center middle;
@@ -94,6 +95,7 @@ AlbumArt {
     height: auto;
     text-align: center;
     width: 100%;
+    margin-top: 1;
 }
 
 .track-artist {
@@ -113,7 +115,7 @@ AlbumArt {
 }
 
 #favorite-btn {
-    color: $accent;
+    color: $accent-pink;
     text-style: bold;
     width: 4;
 }
@@ -160,9 +162,10 @@ AlbumArt {
 
 #bitrate-badge {
     background: $primary-bg;
-    color: $accent;
-    text-style: bold italic;
-    padding: 0 1;
+    color: $accent-pink;
+    border: round $border;
+    text-style: bold;
+    padding: 0 2;
     height: 1;
 }
 
@@ -171,20 +174,23 @@ AlbumArt {
     align: center middle;
     width: 100%;
     height: 3;
+    margin-top: 1;
 }
 
 #media-controls Button {
-    min-width: 4;
-    margin: 0 2;
-    background: transparent;
-    border: none;
+    min-width: 5;
+    margin: 0 1;
+    background: #181926;
+    border: tall #2a2c3d;
     color: $text-primary;
     text-style: bold;
+    height: 3;
 }
 
 #media-controls Button:hover {
+    background: #25283b;
     color: $accent;
-    text-style: bold;
+    border: tall $accent;
 }
 
 /* EQ & Visualizer Styling */
@@ -212,20 +218,20 @@ EqualizerWidget {
     layout: horizontal;
     align: center bottom;
     width: 100%;
-    height: 7; /* Compact vertical compression */
+    height: 7;
     margin-bottom: 0;
 }
 
 .eq-col {
     layout: vertical;
     align: center bottom;
-    width: 1fr; /* Distribute evenly across Center Pane */
+    width: 1fr;
     height: 100%;
 }
 
 .eq-bar {
     width: 1;
-    height: 5; /* Compact vertical slider bar */
+    height: 5;
     color: $accent;
 }
 
@@ -237,7 +243,7 @@ EqualizerWidget {
 
 #vis-container {
     width: 100%;
-    height: 10; /* Roomy space for bordered spectrum visualizer */
+    height: 10;
     margin-top: 1;
     padding: 0;
 }
@@ -247,13 +253,13 @@ SpectrumVisualizer {
     border-title-align: center;
     border-title-color: $accent;
     width: 100%;
-    height: 8; /* 6 lines of render + 2 border rows = 8 */
-    content-align: center bottom; /* Perfectly bottom center the dynamic columns */
+    height: 8;
+    content-align: center bottom;
     background: transparent;
 }
 
 SpectrumVisualizer:hover {
-    border: round $accent;
+    border: round $accent-pink;
     border-title-color: $text-primary;
 }
 
@@ -286,17 +292,20 @@ SpectrumVisualizer:hover {
 }
 
 .lyric-line.active {
-    color: $text-primary;
-    text-style: bold underline;
-    padding: 1 1;
+    background: #00f3ff 12%;
+    color: #00f3ff;
+    text-style: bold;
+    border-left: thick #00f3ff;
+    padding: 1 2;
+    margin: 1 0;
 }
 
 .lyric-line.near-active {
-    color: $text-muted; /* Mid-level focus */
+    color: $text-muted;
 }
 
 .lyric-line.inactive {
-    color: $border; /* Muted fade */
+    color: $border;
 }
 
 #queue-list {
@@ -319,7 +328,7 @@ QueueItemWidget {
     width: 100%;
     padding: 0 1;
     margin-bottom: 0;
-    border-bottom: none; /* Borderless Apple style */
+    border-bottom: none;
 }
 
 .queue-thumb {
@@ -354,7 +363,7 @@ QueueItemWidget {
 }
 
 #autoplay-lbl {
-    color: $accent;
+    color: $accent-pink;
     text-style: bold;
     text-align: right;
     width: 100%;
@@ -362,9 +371,9 @@ QueueItemWidget {
 }
 
 .active-track {
-    background: $panel-bg;
+    background: #181926;
     color: $text-primary;
-    border-left: thick $accent; /* Vertical accent bar */
+    border-left: thick $accent-pink;
 }
 
 .active-track .queue-title {
@@ -394,4 +403,3 @@ QueueItemWidget {
     height: 100%;
     border: none;
 }
-

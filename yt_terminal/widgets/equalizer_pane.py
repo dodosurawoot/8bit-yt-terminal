@@ -2,6 +2,8 @@
 
 from textual.containers import Center
 import random
+import time
+import math
 from textual.widget import Widget
 from textual.widgets import Label, Select
 from textual.containers import Vertical, Horizontal
@@ -127,8 +129,6 @@ class SpectrumVisualizer(Widget):
         if amp <= 0.0:
             if is_playing:
                 # Organic multi-band procedural simulation fallback!
-                import time
-                import math
                 t = time.time()
                 for i in range(self.num_bars):
                     # Rolling wave combined with high-frequency noise
@@ -214,17 +214,17 @@ class SpectrumVisualizer(Widget):
         max_height = 6
         rows = []
         
-        # Style 0: Chunky Winamp-style LED grid (Classic)
+        # Style 0: Chunky Synthwave-style LED grid (Cyan to Pink Gradient)
         if self.current_style == 0:
             for h in range(max_height - 1, -1, -1):
                 if h >= 4:
-                    color = "rgb(240,80,80)"  # Red peaks (Rows 4-5)
+                    color = "#ff2a7a"  # Peak Hot Pink
                 elif h >= 3:
-                    color = "rgb(248,140,50)" # Orange mids (Row 3)
+                    color = "#be44ff"  # Transition Magenta/Violet
                 elif h >= 1:
-                    color = "rgb(250,210,50)" # Yellow low-mids (Rows 1-2)
+                    color = "#00d4ff"  # Cyber Cyan Transition
                 else:
-                    color = "rgb(50,220,100)"  # Green bass base (Row 0)
+                    color = "#00f3ff"  # Base Electric Cyan
                     
                 row_chars = []
                 for i in range(self.num_bars):
@@ -234,9 +234,9 @@ class SpectrumVisualizer(Widget):
                     if val > h:
                         row_chars.append(f"[{color}]█[/]")
                     elif peak == h and peak > 0:
-                        row_chars.append("[#ffa8b0]▀[/]")
+                        row_chars.append("[#ffaec9]▀[/]")
                     else:
-                        row_chars.append("[#3a2230]░[/]")
+                        row_chars.append("[#262938]░[/]")
                         
                 rows.append(" ".join(row_chars))
                 
