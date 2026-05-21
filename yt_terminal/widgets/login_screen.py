@@ -7,6 +7,20 @@ from textual.message import Message
 from yt_terminal.music_service import MusicService
 from yt_terminal.config_manager import ConfigManager
 
+class ClickableCodeLabel(Label):
+    """A label that displays the OAuth code and copies it to the clipboard when clicked."""
+    code_text = ""
+
+    def on_click(self) -> None:
+        if self.code_text:
+            try:
+                import subprocess
+                process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE, close_fds=True)
+                process.communicate(input=self.code_text.encode('utf-8'))
+                self.app.notify("Authorization code copied to clipboard!", title="Clipboard")
+            except Exception:
+                pass
+
 class LoginScreen(Screen):
     """Screen for handling YouTube Music OAuth device registration flow."""
     
@@ -99,6 +113,12 @@ class LoginScreen(Screen):
         margin: 1 0;
     }
 
+    .oauth-code:hover {
+        background: #3c2633;
+        color: #fff0f0;
+        border: round #e8959a;
+    }
+
     .status-msg {
         text-align: center;
         color: #e8959a;
@@ -151,7 +171,7 @@ class LoginScreen(Screen):
                 yield Label("⚡ STEP 1: Go to the verification URL in your browser:", classes="oauth-step-title")
                 yield Label("", id="verification-url-lbl", classes="oauth-url")
                 yield Label("🔑 STEP 2: Enter this device authorization code:", classes="oauth-step-title")
-                yield Label("XXXX-XXXX", id="user-code-lbl", classes="oauth-code")
+                yield ClickableCodeLabel("XXXX-XXXX", id="user-code-lbl", classes="oauth-code")
                 yield Label("Waiting for your authorization... ⏳", id="polling-status-lbl", classes="status-msg")
 
             with Horizontal(id="btn-container"):
@@ -176,8 +196,27 @@ class LoginScreen(Screen):
                 # Show OAuth directions panel
                 self.query_one("#oauth-details-container").display = True
                 self.query_one("#verification-url-lbl", Label).update(code_data["verification_url"])
-                self.query_one("#user-code-lbl", Label).update(f"  {code_data['user_code']}  ")
-                self.query_one("#polling-status-lbl", Label).update("Waiting for your authorization... ⏳")
+                
+                user_code = code_data["user_code"]
+                user_code_lbl = self.query_one("#user-code-lbl", ClickableCodeLabel)
+                user_code_lbl.code_text = user_code
+                user_code_lbl.update(f"  {user_code}  ")
+                
+                # Automatically copy to macOS clipboard
+                copied_successful = False
+                try:
+                    import subprocess
+                    process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE, close_fds=True)
+                    process.communicate(input=user_code.encode('utf-8'))
+                    copied_successful = True
+                except Exception:
+                    pass
+                
+                status_msg = "Waiting for your authorization... ⏳"
+                if copied_successful:
+                    status_msg += " (Copied code to clipboard!)"
+                    self.app.notify("Device code copied to clipboard automatically!", title="Clipboard")
+                self.query_one("#polling-status-lbl", Label).update(status_msg)
 
                 # Automatically open default system web browser to verification URL
                 try:
