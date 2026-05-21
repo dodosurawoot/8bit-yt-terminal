@@ -15,16 +15,33 @@ from rich.text import Text
 class AlbumArt(Widget):
     """Renders the album art image as retro 8-bit colored pixel art."""
     image_path = reactive(None)
-    rendered_art = reactive(None)
 
-    def watch_image_path(self, new_path: str | None) -> None:
-        """Reactively pre-renders the artwork when the path changes."""
-        self.rendered_art = self._pre_render(new_path)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._last_size = (0, 0)
+        self._last_path = None
+        self._cached_rendered_art = None
 
-    def _pre_render(self, path: str | None) -> Text:
+    def render(self) -> Text:
+        w = self.content_size.width
+        h = self.content_size.height
+        
+        # Fallback if dimensions are 0 (e.g. before mount/layout)
+        if w <= 0 or h <= 0:
+            w, h = 32, 12
+            
+        path = self.image_path
+        
+        # If cache is valid, return cached Text object
+        if (w, h) == self._last_size and path == self._last_path and self._cached_rendered_art is not None:
+            return self._cached_rendered_art
+            
+        self._last_size = (w, h)
+        self._last_path = path
+        
         if not path or not os.path.exists(path):
             fallback_text = (
-                "\n\n"
+                "\n"
                 "   .------.  \n"
                 "  /   YT   \\ \n"
                 " |  (O)(O)  |\n"
@@ -33,34 +50,40 @@ class AlbumArt(Widget):
                 "   '------'  \n"
                 "  [NO COVER] "
             )
-            return Text(fallback_text)
-        
+            self._cached_rendered_art = Text(fallback_text)
+            return self._cached_rendered_art
+            
         try:
-            # Open image, downscale and quantize colors for 8-bit styling
             img = Image.open(path)
-            w, h = 32, 24
-            img = img.resize((w, h), Image.Resampling.NEAREST)
+            # Standard square album art aspect ratio fits in character cells
+            # height is in rows, which is half-blocks, so 1 row = 2 pixels high.
+            pixel_w = w
+            pixel_h = h * 2
+            
+            # Find largest square that fits within the available width and height
+            side = min(pixel_w, pixel_h)
+            if side < 4:
+                side = 4
+                
+            img = img.resize((side, side), Image.Resampling.NEAREST)
             # Quantize color palette to 16 colors for dithered/retro console look
             img = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16).convert("RGB")
             
             lines = []
-            for y in range(12):  # 12 character lines, representing 24 pixel vertical lines
+            for y in range(side // 2):
                 line_markup = []
-                for x in range(w):
+                for x in range(side):
                     top_rgb = img.getpixel((x, 2 * y))
                     bottom_rgb = img.getpixel((x, 2 * y + 1))
                     line_markup.append(
                         f"[rgb({top_rgb[0]},{top_rgb[1]},{top_rgb[2]}) on rgb({bottom_rgb[0]},{bottom_rgb[1]},{bottom_rgb[2]})]▀[/]"
                     )
-                lines.append("  " + "".join(line_markup))
-            return Text.from_markup("\n".join(lines))
+                lines.append("".join(line_markup))
+            self._cached_rendered_art = Text.from_markup("\n".join(lines))
         except Exception as e:
-            return Text(f"\n\n Error loading art:\n {str(e)}")
-
-    def render(self) -> Text:
-        if self.rendered_art is None:
-            self.rendered_art = self._pre_render(self.image_path)
-        return self.rendered_art
+            self._cached_rendered_art = Text(f"\n\n Error loading art:\n {str(e)}")
+            
+        return self._cached_rendered_art
 
 class PlayerPane(Widget):
     """The Left Pane showing active song info, artwork, and control bindings."""

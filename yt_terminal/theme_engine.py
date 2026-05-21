@@ -9,6 +9,9 @@ from colorthief import ColorThief
 DEFAULT_THEME = {
     "primary_bg": "#0a0b10",      # Deep obsidian
     "panel_bg": "#131520",        # Translucent glass panel
+    "player_bg": "#121422",       # Tinted player panel
+    "eq_bg": "#151320",           # Tinted EQ panel
+    "right_bg": "#161622",        # Tinted right panels
     "accent": "#00f3ff",          # Cyber cyan
     "text_primary": "#f5f6fa",    # Ice white
     "text_muted": "#686d80",      # Translucent slate-gray
@@ -41,12 +44,19 @@ def extract_palette(image_path=None):
         dominant = color_thief.get_color(quality=1)
         palette = color_thief.get_palette(color_count=5, quality=1)
         
-        # Determine background (darkened dominant color - premium near-black)
-        bg_rgb = darken_color(dominant, 0.25)
-        panel_rgb = darken_color(dominant, 0.35)
+        # Ensure we have at least 3 distinct dominant colors from palette
+        c1 = palette[0] if len(palette) > 0 else dominant
+        c2 = palette[1] if len(palette) > 1 else darken_color(c1, 0.8)
+        c3 = palette[2] if len(palette) > 2 else lighten_color(c1, 1.2)
+        
+        # Darken the colors appropriately for premium near-black panels
+        player_rgb = darken_color(c1, 0.12)
+        eq_rgb = darken_color(c2, 0.12)
+        right_rgb = darken_color(c3, 0.12)
+        bg_rgb = darken_color(dominant, 0.08)
+        panel_rgb = darken_color(dominant, 0.15)
         
         # Pick best accent from palette
-        # We look for a bright light color in the palette
         accent_rgb = dominant
         for col in palette:
             # Simple luminance check
@@ -70,6 +80,9 @@ def extract_palette(image_path=None):
         return {
             "primary_bg": rgb_to_hex(bg_rgb),
             "panel_bg": rgb_to_hex(panel_rgb),
+            "player_bg": rgb_to_hex(player_rgb),
+            "eq_bg": rgb_to_hex(eq_rgb),
+            "right_bg": rgb_to_hex(right_rgb),
             "accent": rgb_to_hex(accent_rgb),
             "text_primary": rgb_to_hex(text_rgb),
             "text_muted": rgb_to_hex(muted_rgb),
@@ -122,8 +135,10 @@ def generate_tcss(theme_dict):
     """
     return f"""
 /* Generated TUI Theme Stylesheet */
-$primary-bg: {theme_dict['primary_bg']};
-$panel-bg: {theme_dict['panel_bg']};
+$primary-bg: {theme_dict.get('primary_bg', '#0a0b10')};
+$player-bg: {theme_dict.get('player_bg', '#121422')};
+$eq-bg: {theme_dict.get('eq_bg', '#151320')};
+$right-bg: {theme_dict.get('right_bg', '#161622')};
 $accent: {theme_dict['accent']};
 $text-primary: {theme_dict['text_primary']};
 $text-muted: {theme_dict['text_muted']};
@@ -138,8 +153,26 @@ Screen {{
     background: $primary-bg;
 }}
 
-#player-pane, #eq-pane, #lyrics-view, #queue-view {{
-    background: $panel-bg;
+#player-pane {{
+    background: $player-bg 85%;
+    border: round $border;
+    color: $text-primary;
+}}
+
+#eq-pane {{
+    background: $eq-bg 80%;
+    border: round $border;
+    color: $text-primary;
+}}
+
+#lyrics-view {{
+    background: $right-bg 75%;
+    border: round $border;
+    color: $text-primary;
+}}
+
+#queue-view {{
+    background: $right-bg 75%;
     border: round $border;
     color: $text-primary;
 }}

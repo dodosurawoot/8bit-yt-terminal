@@ -27,63 +27,66 @@ Screen {
 }
 
 #player-pane {
-    width: 1fr;
-    min-width: 38;
+    width: 34%;
+    min-width: 40;
     height: 100%;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent;
     border-title-style: bold;
     padding: 1 2;
-    margin: 0 1 0 0;
+    margin: 0 1 0 1;
     content-align: center top;
 }
 
 #eq-pane {
-    width: 1fr;
+    width: 32%;
     min-width: 36;
     height: 100%;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent-pink;
     border-title-style: bold;
-    padding: 1 1;
-    margin: 0 1 0 0;
+    padding: 1 2;
+    margin: 0 1;
     layout: vertical;
     align: center middle;
 }
 
 #right-pane {
-    width: 1fr;
-    min-width: 32;
+    width: 34%;
+    min-width: 34;
     height: 100%;
     layout: vertical;
+    margin: 0 1 0 0;
 }
 
 #lyrics-view {
-    height: 45%;
+    height: 48%;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent;
     border-title-style: bold;
-    padding: 0 1;
+    padding: 1 2;
     margin: 0 0 1 0;
 }
 
 #queue-view {
-    height: 55%;
+    height: 52%;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent-pink;
     border-title-style: bold;
-    padding: 0 1;
+    padding: 1 2;
     layout: vertical;
 }
 
 /* Left Pane Widgets styling */
 AlbumArt {
-    width: 36;
-    height: 14;
+    width: 100%;
+    height: 1fr;
+    min-height: 8;
+    max-height: 20;
     border: round $accent;
     margin: 1 0;
     background: $primary-bg;
@@ -119,11 +122,25 @@ AlbumArt {
     color: $accent-pink;
     text-style: bold;
     width: 4;
+    text-align: center;
+    transition: color 300ms, background 300ms;
+}
+
+#favorite-btn:hover {
+    color: #ffffff;
+    background: #ff2a7a 20%;
 }
 
 #menu-btn {
     color: $text-muted;
     width: 4;
+    text-align: center;
+    transition: color 300ms, background 300ms;
+}
+
+#menu-btn:hover {
+    color: $accent;
+    background: #00f3ff 20%;
 }
 
 #progress-container {
@@ -289,24 +306,23 @@ SpectrumVisualizer:hover {
     width: 100%;
     padding: 0 1;
     height: auto;
-    transition: color 500ms, text-style 500ms;
+    transition: color 400ms, background 400ms;
 }
 
 .lyric-line.active {
-    background: #00f3ff 12%;
-    color: #00f3ff;
+    background: $accent 15%;
+    color: #ffffff;
     text-style: bold;
-    border-left: thick #00f3ff;
     padding: 1 2;
     margin: 1 0;
 }
 
 .lyric-line.near-active {
-    color: $text-muted;
+    color: $text-primary 75%;
 }
 
 .lyric-line.inactive {
-    color: $border;
+    color: $text-muted 50%;
 }
 
 #queue-list {
@@ -330,6 +346,15 @@ QueueItemWidget {
     padding: 0 1;
     margin-bottom: 0;
     border-bottom: none;
+    transition: background 300ms;
+}
+
+.queue-item:hover {
+    background: #181926;
+}
+
+.queue-item:hover .queue-title {
+    color: $accent;
 }
 
 .queue-thumb {
@@ -356,19 +381,29 @@ QueueItemWidget {
 
 #queue-header {
     layout: horizontal;
-    height: 2;
-    align: center middle;
+    height: 3;
+    align: right middle;
     width: 100%;
     margin-bottom: 1;
     border-bottom: solid $border;
 }
 
 #autoplay-lbl {
+    background: #181926;
     color: $accent-pink;
+    border: round $border;
     text-style: bold;
-    text-align: right;
-    width: 100%;
-    margin-right: 1;
+    padding: 0 2;
+    height: 1;
+    margin-right: 2;
+    align: right middle;
+    transition: background 300ms, color 300ms;
+}
+
+#autoplay-lbl:hover {
+    background: $accent-pink;
+    color: #ffffff;
+    border: round $accent-pink;
 }
 
 .active-track {
@@ -403,4 +438,69 @@ QueueItemWidget {
 #main-layout.fullscreen-lyrics-active #lyrics-view {
     height: 100%;
     border: none;
+}
+
+/* Premium Header and Footer overlays */
+Header {
+    background: #0a0b10;
+    color: $accent;
+    text-style: bold;
+    height: 1;
+    border-bottom: solid $border;
+}
+
+HeaderClock {
+    background: #131520;
+    color: $accent-pink;
+    text-style: bold;
+}
+
+Footer {
+    background: #0a0b10;
+    color: $text-muted;
+    height: 1;
+    border-top: solid $border;
+}
+
+FooterKey {
+    background: #131520;
+    color: $text-primary;
+    border-radius: 3;
+    margin: 0 1;
+}
+
+FooterKey:hover {
+    background: $accent-pink;
+    color: #ffffff;
+}
+
+FooterKey--key {
+    color: $accent;
+    text-style: bold;
+}
+
+FooterKey--description {
+    color: $text-primary;
+}
+
+/* Glass-style Select Dropdowns */
+Select {
+    width: 24;
+    background: #181926;
+    color: $text-primary;
+    border: round $border;
+    height: 3;
+}
+
+Select:focus {
+    border: round $accent;
+}
+
+Select__control {
+    color: $text-primary;
+}
+
+Select__overlay {
+    background: #131520;
+    border: round $border;
 }
