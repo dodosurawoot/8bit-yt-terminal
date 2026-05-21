@@ -465,7 +465,6 @@ Footer {
 FooterKey {
     background: #131520;
     color: $text-primary;
-    border-radius: 3;
     margin: 0 1;
 }
 
