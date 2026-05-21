@@ -513,6 +513,16 @@ Footer {
     dock: bottom;
 }
 
+AppFooter {
+    background: #0a0b10;
+    color: $text-muted;
+    height: 1;
+    border-top: solid $border;
+    dock: bottom;
+    content-align: center middle;
+}
+
+
 FooterKey {
     background: #131520;
     color: $text-primary;

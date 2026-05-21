@@ -25,6 +25,7 @@ from yt_terminal.widgets.lyrics_view import LyricsView
 from yt_terminal.widgets.queue_view import QueueView
 from yt_terminal.widgets.login_screen import LoginScreen
 from yt_terminal.widgets.search_overlay import SearchOverlay
+from yt_terminal.widgets.app_footer import AppFooter
 
 from yt_terminal.music_service import MusicService, Track
 from yt_terminal.audio_player import AudioPlayer
@@ -42,16 +43,17 @@ class YTTerminalApp(App):
     
     # Global hotkeys including '/' search
     BINDINGS = [
-        Binding("space", "toggle_play", "Play/Pause", show=True),
-        Binding("n", "next_track", "Next Track", show=True),
-        Binding("p", "prev_track", "Prev Track", show=True),
-        Binding("l", "toggle_lyrics_fullscreen", "Full Lyrics", show=True),
-        Binding("w", "toggle_art_lyrics", "Lyrics + Art", show=True),
-        Binding("slash", "search_overlay", "Search", show=True),
-        Binding("a", "sync_account", "Sync Account", show=True),
-        Binding("plus", "volume_up", "Vol +", show=True),
-        Binding("minus", "volume_down", "Vol -", show=True),
-        Binding("q", "quit", "Quit Player", show=True),
+        Binding("space", "toggle_play", "Play/Pause", show=False),
+        Binding("n", "next_track", "Next Track", show=False),
+        Binding("p", "prev_track", "Prev Track", show=False),
+        Binding("l", "toggle_lyrics_fullscreen", "Full Lyrics", show=False),
+        Binding("w", "toggle_art_lyrics", "Lyrics + Art", show=False),
+        Binding("slash", "search_overlay", "Search", show=False),
+        Binding("a", "sync_account", "Sync Account", show=False),
+        Binding("plus", "volume_up", "Vol +", show=False),
+        Binding("minus", "volume_down", "Vol -", show=False),
+        Binding("q,ctrl+q", "quit", "Quit", show=False),
+        Binding("ctrl+p", "command_palette", "palette", show=False),
     ]
     
     # Playback Reactives
@@ -94,7 +96,7 @@ class YTTerminalApp(App):
                 yield self.lyrics_view
                 yield self.queue_view
                 
-        yield Footer()
+        yield AppFooter()
 
     def on_resize(self, event) -> None:
         """Dynamically adjusts layout when the terminal is resized."""
