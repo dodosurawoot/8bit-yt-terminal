@@ -6,6 +6,18 @@ from rich.text import Text
 class AppFooter(Widget):
     """A customized premium TUI footer displaying exact keybindings with Obsidian Synthwave theme colors."""
 
+    DEFAULT_CSS = """
+    AppFooter {
+        background: #0a0b10;
+        color: #686d80;
+        height: 1;
+        width: 100%;
+        dock: bottom;
+        border-top: solid #262938;
+        content-align: center middle;
+    }
+    """
+
     def render(self) -> Text:
         """Renders the beautifully styled keybindings with golden keys and white labels."""
         return Text.from_markup(
