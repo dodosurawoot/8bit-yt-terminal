@@ -474,12 +474,12 @@ FooterKey:hover {
     color: #ffffff;
 }
 
-FooterKey--key {
+FooterKey .footer-key--key {
     color: $accent;
     text-style: bold;
 }
 
-FooterKey--description {
+FooterKey .footer-key--description {
     color: $text-primary;
 }
 
