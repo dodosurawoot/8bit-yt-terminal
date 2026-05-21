@@ -445,6 +445,26 @@ QueueItemWidget {
     border: none;
 }
 
+/* Expanded Album Art with Lyrics Mode (w) */
+#main-layout.expanded-art-lyrics-active #eq-pane {
+    display: none;
+}
+#main-layout.expanded-art-lyrics-active #queue-view {
+    display: none;
+}
+#main-layout.expanded-art-lyrics-active #player-pane {
+    width: 50%;
+    height: 1fr;
+}
+#main-layout.expanded-art-lyrics-active #right-pane {
+    width: 50%;
+    height: 1fr;
+}
+#main-layout.expanded-art-lyrics-active #lyrics-view {
+    height: 100%;
+    border: none;
+}
+
 /* Premium Header and Footer overlays */
 Header {
     background: #0a0b10;

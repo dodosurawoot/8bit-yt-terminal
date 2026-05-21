@@ -46,6 +46,7 @@ class YTTerminalApp(App):
         Binding("n", "next_track", "Next Track", show=True),
         Binding("p", "prev_track", "Prev Track", show=True),
         Binding("l", "toggle_lyrics_fullscreen", "Full Lyrics", show=True),
+        Binding("w", "toggle_art_lyrics", "Lyrics + Art", show=True),
         Binding("slash", "search_overlay", "Search", show=True),
         Binding("a", "sync_account", "Sync Account", show=True),
         Binding("q", "quit", "Quit Player", show=True),
@@ -312,7 +313,17 @@ class YTTerminalApp(App):
         """Toggles immersive full-screen lyrics mode."""
         try:
             layout = self.query_one("#main-layout")
+            layout.remove_class("expanded-art-lyrics-active")
             layout.toggle_class("fullscreen-lyrics-active")
+        except Exception:
+            pass
+
+    def action_toggle_art_lyrics(self) -> None:
+        """Toggles Apple Music style expanded album art with lyrics mode."""
+        try:
+            layout = self.query_one("#main-layout")
+            layout.remove_class("fullscreen-lyrics-active")
+            layout.toggle_class("expanded-art-lyrics-active")
         except Exception:
             pass
 
