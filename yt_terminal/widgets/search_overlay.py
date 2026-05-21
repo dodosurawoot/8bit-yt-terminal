@@ -40,7 +40,6 @@ class SearchOverlay(Screen):
         height: 3;
         margin-bottom: 1;
         background: #22151b;
-        border-radius: 1;
     }
 
     .filter-btn {
