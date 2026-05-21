@@ -29,7 +29,7 @@ Screen {
 #player-pane {
     width: 34%;
     min-width: 40;
-    height: 100%;
+    height: 1fr;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent;
@@ -37,12 +37,13 @@ Screen {
     padding: 1 2;
     margin: 0 1 0 1;
     content-align: center top;
+    overflow: hidden;
 }
 
 #eq-pane {
     width: 32%;
     min-width: 36;
-    height: 100%;
+    height: 1fr;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent-pink;
@@ -51,34 +52,38 @@ Screen {
     margin: 0 1;
     layout: vertical;
     align: center middle;
+    overflow: hidden;
 }
 
 #right-pane {
     width: 34%;
     min-width: 34;
-    height: 100%;
+    height: 1fr;
     layout: vertical;
     margin: 0 1 0 0;
+    overflow: hidden;
 }
 
 #lyrics-view {
-    height: 48%;
+    height: 48fr;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent;
     border-title-style: bold;
     padding: 1 2;
     margin: 0 0 1 0;
+    overflow: hidden;
 }
 
 #queue-view {
-    height: 52%;
+    height: 52fr;
     background: $panel-bg;
     border: round $border;
     border-title-color: $accent-pink;
     border-title-style: bold;
     padding: 1 2;
     layout: vertical;
+    overflow: hidden;
 }
 
 /* Left Pane Widgets styling */
@@ -460,6 +465,7 @@ Footer {
     color: $text-muted;
     height: 1;
     border-top: solid $border;
+    dock: bottom;
 }
 
 FooterKey {
